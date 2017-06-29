@@ -19,18 +19,24 @@ package se.bigdatamining.forecastmaster;
  *
  * @author Magnus Palm
  */
+import java.io.Serializable;
+import javax.enterprise.context.SessionScoped;
 import javax.faces.application.FacesMessage;
-import javax.faces.bean.ManagedBean;
 import javax.faces.context.FacesContext;
+import javax.inject.Named;
 
 import org.primefaces.event.FileUploadEvent;
 import org.primefaces.model.UploadedFile;
 
-@ManagedBean
-public class FileLoadView {
+@Named(value="fileLoadView")
+@SessionScoped
+public class FileLoadView implements Serializable{
 
+    private static final long serialVersionUID = 1L;
     public void handleFileUpload(FileUploadEvent event) {
         FacesMessage message = new FacesMessage("Succesful", event.getFile().getFileName() + " is uploaded.");
         FacesContext.getCurrentInstance().addMessage(null, message);
+        
+//        Insert the excel read code here...
     }
 }

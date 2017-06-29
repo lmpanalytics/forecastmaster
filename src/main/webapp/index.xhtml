@@ -15,13 +15,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml">
-    <head>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:h="http://java.sun.com/jsf/html"
+      xmlns:f="http://java.sun.com/jsf/core"
+      xmlns:p="http://primefaces.org/ui">
+    <h:head>
         <title>Forecast</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    </head>
-    <body>
+    </h:head>
+    <h:body>
         <div>TODO write content</div>
-        <h1>Hello World again!</h1>
-    </body>
+        <h1>Upload the history file</h1>
+
+        <h:form>
+            <p:fileUpload fileUploadListener="#{fileLoadView.handleFileUpload}" mode="advanced" dragDropSupport="false"
+                          update="messages" sizeLimit="100000" fileLimit="1" allowTypes="/(\.|\/)(xlsx)$/" />
+
+            <p:growl id="messages" showDetail="true" />
+        </h:form>
+    </h:body>
 </html>
