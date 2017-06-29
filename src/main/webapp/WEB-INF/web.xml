@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app version="3.1" xmlns="http://xmlns.jcp.org/xml/ns/javaee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd">
+    <description>This is a web application that forecast the next periods based on historical data.</description>
+    <display-name>ForecastMaster</display-name>
+    <context-param>
+        <param-name>javax.faces.PROJECT_STAGE</param-name>
+        <param-value>Development</param-value>
+    </context-param>
+    <context-param> 
+        <description>Enable debugging for the application</description> 
+        <param-name>debug</param-name> 
+        <param-value>true</param-value> 
+    </context-param> 
+    <context-param> 
+        <description>The email address of the administrator, used to send error reports.</description> 
+        <param-name>webmaster</param-name> 
+        <param-value>magnus@bigdatamining.se</param-value> 
+    </context-param> 
+    <session-config>
+        <session-timeout>
+            30
+        </session-timeout>
+    </session-config>
+    <welcome-file-list>
+        <welcome-file>index.xhtml</welcome-file>
+    </welcome-file-list>
+</web-app>
