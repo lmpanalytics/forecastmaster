@@ -23,21 +23,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.Serializable;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Iterator;
 import javax.enterprise.context.SessionScoped;
 import javax.faces.application.FacesMessage;
 import javax.faces.context.FacesContext;
 import javax.inject.Named;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellType;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import org.primefaces.event.FileUploadEvent;
@@ -48,22 +40,24 @@ import org.primefaces.model.UploadedFile;
 public class FileLoadView implements Serializable {
 
     private static final long serialVersionUID = 1L;
+    private static FileInputStream excelFile;
+    private static final String FILE_NAME = "C:\\payara41\\glassfish\\domains\\domain1\\generated\\jsp\\forecastmaster\\data.xlsx";
 
     public void handleFileUpload(FileUploadEvent event) throws Exception {
 
+        FacesMessage message = new FacesMessage("Succesful", event.getFile().getFileName() + " is uploaded.");
+        FacesContext.getCurrentInstance().addMessage(null, message);
+
+//            Write the file to disk
+        event.getFile().write("data.xlsx");
+
+        readExcel();
+    }
+
+    public static void readExcel() {
         try {
-            FacesMessage message = new FacesMessage("Succesful", event.getFile().getFileName() + " is uploaded.");
-            FacesContext.getCurrentInstance().addMessage(null, message);
 
-//        Insert the excel read code here...
-            String FILE_NAME = "C:\\payara41\\glassfish\\domains\\domain1\\generated\\jsp\\forecastmaster\\data.xlsx";
-            UploadedFile file = event.getFile();
-
-            file.write("data.xlsx");
-
-//            InputStream stream = file.getInputstream();
-//            FileInputStream excelFile = (FileInputStream) stream;
-            FileInputStream excelFile = new FileInputStream(new File(FILE_NAME));
+            excelFile = new FileInputStream(new File(FILE_NAME));
             Workbook workbook = new XSSFWorkbook(excelFile);
             Sheet datatypeSheet = workbook.getSheetAt(0);
             Iterator<Row> iterator = datatypeSheet.iterator();
@@ -87,7 +81,7 @@ public class FileLoadView implements Serializable {
                     }
 
                 }
-                System.out.println();
+//                System.out.println();
 
             }
         } catch (FileNotFoundException e) {
@@ -96,4 +90,9 @@ public class FileLoadView implements Serializable {
             e.printStackTrace();
         }
     }
+
+    public FileInputStream getExcelFile() {
+        return excelFile;
+    }
+
 }
