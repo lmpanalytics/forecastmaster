@@ -40,4 +40,6 @@ Thumbs.db
 *.csv
 *.xlsx
 target/
+/target/
 nbproject/
+/nbproject/
