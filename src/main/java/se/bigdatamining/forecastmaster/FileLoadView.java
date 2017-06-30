@@ -19,7 +19,6 @@ package se.bigdatamining.forecastmaster;
  *
  * @author Magnus Palm
  */
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -33,7 +32,6 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import org.primefaces.event.FileUploadEvent;
-import org.primefaces.model.UploadedFile;
 
 @Named(value = "fileLoadView")
 @SessionScoped
@@ -41,24 +39,33 @@ public class FileLoadView implements Serializable {
 
     private static final long serialVersionUID = 1L;
     private static FileInputStream excelFile;
-    private static final String FILE_NAME = "C:\\payara41\\glassfish\\domains\\domain1\\generated\\jsp\\forecastmaster\\data.xlsx";
 
+    /**
+     * Handles the file upload
+     *
+     * @param event
+     * @throws Exception
+     */
     public void handleFileUpload(FileUploadEvent event) throws Exception {
 
         FacesMessage message = new FacesMessage("Succesful", event.getFile().getFileName() + " is uploaded.");
         FacesContext.getCurrentInstance().addMessage(null, message);
 
-//            Write the file to disk
-        event.getFile().write("data.xlsx");
+//            Access the uploaded file from memory
+        this.excelFile = (FileInputStream) event.getFile().getInputstream();
 
+//        Convert the file to Excel format
         readExcel();
     }
 
-    public static void readExcel() {
+    /**
+     * Reads an Excel file, based on:
+     * https://www.mkyong.com/java/apache-poi-reading-and-writing-excel-file-in-java/
+     */
+    private void readExcel() {
         try {
 
-            excelFile = new FileInputStream(new File(FILE_NAME));
-            Workbook workbook = new XSSFWorkbook(excelFile);
+            Workbook workbook = new XSSFWorkbook(this.excelFile);
             Sheet datatypeSheet = workbook.getSheetAt(0);
             Iterator<Row> iterator = datatypeSheet.iterator();
 
@@ -89,10 +96,6 @@ public class FileLoadView implements Serializable {
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    public FileInputStream getExcelFile() {
-        return excelFile;
     }
 
 }
