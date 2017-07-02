@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='UTF-8' ?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
 Copyright 2017 LMP Consulting.
 
@@ -14,7 +14,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -->
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml"
       xmlns:h="http://java.sun.com/jsf/html"
       xmlns:f="http://java.sun.com/jsf/core"
@@ -22,15 +22,15 @@ limitations under the License.
       xmlns:p="http://primefaces.org/ui">
 
     <f:view contentType="text/html">
+
         <h:head>
             <f:facet name="first">
                 <meta content='text/html; charset=UTF-8' http-equiv="Content-Type"/>
-                <title>ForecastMaster</title>
+                <title>Upload</title>
             </f:facet>
         </h:head>
 
         <h:body>
-
             <p:layout fullPage="true">
 
                 <p:layoutUnit position="north" size="200" resizable="true" closable="true" collapsible="true">
@@ -87,31 +87,28 @@ limitations under the License.
 
                         <h1>LMP ForecastMaster</h1>
                     </h:form>
-                </p:layoutUnit>
 
+                </p:layoutUnit>
                 <p:layoutUnit position="south" size="100" closable="true" collapsible="true">
                     Footer
                 </p:layoutUnit>
 
                 <p:layoutUnit position="west" size="175" header="Left" collapsible="true">
-                    <p:menu>
-                        <p:submenu label="Resources">
-                            <p:menuitem value="Other" url="#" icon="ui-icon-star" />
+                    <h:form>
+                        <p:fileUpload fileUploadListener="#{fileLoadView.handleFileUpload}" mode="advanced" dragDropSupport="false"
+                                      update="messages" sizeLimit="1000000" fileLimit="1" allowTypes="/(\.|\/)(xlsx)$/" />
 
-                        </p:submenu>
+                        <p:growl id="messages" showDetail="true" />
 
-                    </p:menu>
-                    Replace with data tree?
+                    </h:form>
+                    <p:button value="HOME" outcome="/index" />
                 </p:layoutUnit>
 
                 <p:layoutUnit position="center">
-                    Add plot graph of sales as a function of time
+                    Add data table of uploaded data
                 </p:layoutUnit>
-
             </p:layout>
 
         </h:body>
-
     </f:view>
 </html>
-

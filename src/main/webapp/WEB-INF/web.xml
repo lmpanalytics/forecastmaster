@@ -6,21 +6,20 @@
         <param-name>javax.faces.PROJECT_STAGE</param-name>
         <param-value>Development</param-value>
     </context-param>
-    <context-param> 
-        <description>Enable debugging for the application</description> 
-        <param-name>debug</param-name> 
-        <param-value>true</param-value> 
-    </context-param> 
-    <context-param> 
-        <description>The email address of the administrator, used to send error reports.</description> 
-        <param-name>webmaster</param-name> 
-        <param-value>magnus@bigdatamining.se</param-value> 
-    </context-param> 
+    <context-param>
+        <description>Enable debugging for the application</description>
+        <param-name>debug</param-name>
+        <param-value>true</param-value>
+    </context-param>
+    <context-param>
+        <description>The email address of the administrator, used to send error reports.</description>
+        <param-name>webmaster</param-name>
+        <param-value>magnus@bigdatamining.se</param-value>
+    </context-param>
     <context-param>
         <param-name>primefaces.UPLOADER</param-name>
         <param-value>auto</param-value>
     </context-param>
-    
     <session-config>
         <session-timeout>
             30
