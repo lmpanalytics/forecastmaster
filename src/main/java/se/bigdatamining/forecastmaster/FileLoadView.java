@@ -16,6 +16,7 @@
 package se.bigdatamining.forecastmaster;
 
 /**
+ * This class writes and reads data from an Excel file to a Neo4j DB
  *
  * @author Magnus Palm
  */
@@ -23,11 +24,14 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import javax.enterprise.context.SessionScoped;
 import javax.faces.application.FacesMessage;
 import javax.faces.context.FacesContext;
 import javax.inject.Named;
+import org.apache.poi.hssf.usermodel.HSSFDateUtil;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
@@ -62,17 +66,23 @@ public class FileLoadView implements Serializable {
      * Reads an Excel file, based on:
      * https://www.mkyong.com/java/apache-poi-reading-and-writing-excel-file-in-java/
      */
-    private void readExcel() {
+    private Map<Long, Pattern> readExcel() {
+        Map<Long, Pattern> m = new HashMap<>();
+
         try {
 
             Workbook workbook = new XSSFWorkbook(this.excelFile);
             Sheet datatypeSheet = workbook.getSheetAt(0);
-            Iterator<Row> iterator = datatypeSheet.iterator();
+            Iterator<Row> rowIterator = datatypeSheet.iterator();
 
-            while (iterator.hasNext()) {
+            while (rowIterator.hasNext()) {
 
-                Row currentRow = iterator.next();
+                Row currentRow = rowIterator.next();
                 Iterator<Cell> cellIterator = currentRow.iterator();
+
+//                Initiate the date time (in ms since 1970-01-01) and the response variable
+                Long msTime = Long.MAX_VALUE;
+                Double responeVar = 0d;
 
                 while (cellIterator.hasNext()) {
 
@@ -80,22 +90,31 @@ public class FileLoadView implements Serializable {
                     //getCellTypeEnum shown as deprecated for version 3.15
                     //getCellTypeEnum ill be renamed to getCellType starting from version 4.0
                     if (currentCell.getCellTypeEnum() == CellType.STRING) {
-                        System.out.print(currentCell.getStringCellValue() + "--");
+//                        System.out.print(currentCell.getStringCellValue() + " I'm a String ");
+//  HSSFDateUtil will throw an exception if fed a String, hence placed after above condition
+                    } else if (HSSFDateUtil.isCellInternalDateFormatted(currentCell)) {
+                        msTime = currentCell.getDateCellValue().getTime();
+//                        System.out.print(msTime + " I'm a date ");
                     } else if (currentCell.getCellTypeEnum() == CellType.NUMERIC) {
-                        System.out.print(currentCell.getNumericCellValue() + "--");
+                        responeVar = currentCell.getNumericCellValue();
+//                        System.out.print(data + " I'm a number ");
                     } else if (currentCell.getCellTypeEnum() == CellType.FORMULA) {
-                        System.out.print(currentCell.getNumericCellValue() + "-*-");
+//                        System.out.print(currentCell.getNumericCellValue() + " I'm a formula ");
                     }
 
+//                    Add to map if and only if the Excel row starts with a valid internal date format
+                    if (msTime != Long.MAX_VALUE) {
+                        m.put(msTime, new Pattern(msTime, responeVar));
+                    }
                 }
-//                System.out.println();
-
             }
+
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return m;
     }
 
 }
