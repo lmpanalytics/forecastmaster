@@ -24,16 +24,21 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.Serializable;
+import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import javax.enterprise.context.SessionScoped;
 import javax.faces.application.FacesMessage;
 import javax.faces.context.FacesContext;
+import javax.inject.Inject;
 import javax.inject.Named;
 import org.apache.poi.hssf.usermodel.HSSFDateUtil;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.neo4j.driver.v1.Session;
+import org.neo4j.driver.v1.Transaction;
+import static org.neo4j.driver.v1.Values.parameters;
 
 import org.primefaces.event.FileUploadEvent;
 
@@ -41,8 +46,11 @@ import org.primefaces.event.FileUploadEvent;
 @SessionScoped
 public class FileLoadView implements Serializable {
 
+    @Inject
+    Neo4jBean neo;
     private static final long serialVersionUID = 1L;
     private static FileInputStream excelFile;
+    Timestamp timestamp;
 
     /**
      * Handles the file upload
@@ -58,8 +66,14 @@ public class FileLoadView implements Serializable {
 //            Access the uploaded file from memory
         this.excelFile = (FileInputStream) event.getFile().getInputstream();
 
-//        Convert the file to Excel format
-        readExcel();
+//        Convert the file to Excel format and populate pattern map
+        Map<Long, Pattern> patternMap = readExcel();
+
+//        Write data patterns to the data base
+        addPattern(patternMap);
+
+        timestamp = new Timestamp(System.currentTimeMillis());
+        System.out.println(timestamp + ": Data written to Neo4j DB.");
     }
 
     /**
@@ -115,6 +129,29 @@ public class FileLoadView implements Serializable {
             e.printStackTrace();
         }
         return m;
+    }
+
+    /**
+     * Adds data patterns to the data base
+     *
+     * @param pattern
+     */
+    private void addPattern(Map<Long, Pattern> pattern) {
+        // Sessions are lightweight and disposable connection wrappers.
+        try (Session session = neo.getDRIVER().session()) {
+            // Wrapping Cypher in an explicit transaction provides atomicity
+            // and makes handling errors much easier.
+            try (Transaction tx = session.beginTransaction()) {
+                pattern.values().stream().forEach((v) -> {
+                    Double respVar0 = v.getResponeVar0();
+                    Long ms = v.getMsTime();
+                    tx.run("MERGE (a:Pattern {msEpoch: {t}, respVar0: {rv0}})",
+                            parameters("t", ms,
+                                    "rv0", respVar0));
+                    tx.success();  // Mark this write as successful.
+                });
+            }
+        }
     }
 
 }

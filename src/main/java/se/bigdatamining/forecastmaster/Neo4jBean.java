@@ -54,6 +54,7 @@ public class Neo4jBean {
      * @return the DB driver
      */
     public Driver getDRIVER() {
+        timestamp = new Timestamp(System.currentTimeMillis());
         System.out.println(timestamp + ": Aquire Neo4jDriver.");
         return DRIVER;
     }
