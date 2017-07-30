@@ -15,12 +15,13 @@
  */
 package se.bigdatamining.forecastmaster;
 
-import java.sql.Timestamp;
 import javax.annotation.PreDestroy;
 import javax.ejb.Singleton;
 import org.neo4j.driver.v1.AuthTokens;
 import org.neo4j.driver.v1.Driver;
 import org.neo4j.driver.v1.GraphDatabase;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This bean provides the database service
@@ -30,12 +31,12 @@ import org.neo4j.driver.v1.GraphDatabase;
 @Singleton
 public class Neo4jBean {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(Neo4jBean.class);
     private static final String URI = "bolt://localhost:7687";
     private static final String USER = "neo4j";
     private static final String PASSWORD = "Tokyo2000";
 
     private final Driver DRIVER;
-    private Timestamp timestamp;
 
     public Neo4jBean() {
         this.DRIVER = GraphDatabase.driver(URI, AuthTokens.basic(USER, PASSWORD));
@@ -45,8 +46,7 @@ public class Neo4jBean {
     public void destroyMe() {
         DRIVER.session().close();
         DRIVER.close();
-        timestamp = new Timestamp(System.currentTimeMillis());
-        System.out.println(timestamp + ": Neo4jDriver in Neo4jBean has been disposed of.");
+        LOGGER.info("Neo4jDriver in Neo4jBean has been disposed of.");
     }
 
     /**
@@ -54,8 +54,7 @@ public class Neo4jBean {
      * @return the DB driver
      */
     public Driver getDRIVER() {
-        timestamp = new Timestamp(System.currentTimeMillis());
-        System.out.println(timestamp + ": Aquire Neo4jDriver.");
+        LOGGER.info("Aquire Neo4jDriver.");
         return DRIVER;
     }
 
@@ -64,7 +63,6 @@ public class Neo4jBean {
      */
     public void closeNeo4jDriver() {
         DRIVER.close();
-        timestamp = new Timestamp(System.currentTimeMillis());
-        System.out.println(timestamp + ": closed Neo4jDriver.");
+        LOGGER.info("Closed Neo4jDriver.");
     }
 }

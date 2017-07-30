@@ -24,7 +24,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.Serializable;
-import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -41,6 +40,8 @@ import org.neo4j.driver.v1.Transaction;
 import static org.neo4j.driver.v1.Values.parameters;
 
 import org.primefaces.event.FileUploadEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Named(value = "fileLoadView")
 @SessionScoped
@@ -48,9 +49,9 @@ public class FileLoadView implements Serializable {
 
     @Inject
     Neo4jBean neo;
+    private static final Logger LOGGER = LoggerFactory.getLogger(FileLoadView.class);
     private static final long serialVersionUID = 1L;
     private static FileInputStream excelFile;
-    Timestamp timestamp;
 
     /**
      * Handles the file upload
@@ -72,8 +73,7 @@ public class FileLoadView implements Serializable {
 //        Write data patterns to the data base
         addPattern(patternMap);
 
-        timestamp = new Timestamp(System.currentTimeMillis());
-        System.out.println(timestamp + ": Data written to Neo4j DB.");
+        LOGGER.info("Data written to Neo4j DB.");
     }
 
     /**
