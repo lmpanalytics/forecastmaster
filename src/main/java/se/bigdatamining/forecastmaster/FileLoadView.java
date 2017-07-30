@@ -145,7 +145,9 @@ public class FileLoadView implements Serializable {
                 pattern.values().stream().forEach((v) -> {
                     Double respVar0 = v.getResponeVar0();
                     Long ms = v.getMsTime();
-                    tx.run("MERGE (a:Pattern {msEpoch: {t}, respVar0: {rv0}})",
+                    tx.run("MATCH (c:Customer { customerNumber: '0000000001' })"
+                            + "MERGE (p:Pattern {msEpoch: {t}, respVar0: {rv0}}) "
+                            + "MERGE (p)-[:OWNED_BY]->(c)",
                             parameters("t", ms,
                                     "rv0", respVar0));
                     tx.success();  // Mark this write as successful.
