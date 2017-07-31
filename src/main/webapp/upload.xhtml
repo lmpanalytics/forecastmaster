@@ -38,17 +38,18 @@ limitations under the License.
                         <p:growl id="messages"/>
 
                         <p:menubar>
-                            <p:submenu label="File" icon="ui-icon-document">
-                                <p:submenu label="New" icon="ui-icon-contact">
-                                    <p:menuitem value="Data Upload" outcome="/upload" />
-                                    <p:menuitem value="Other" url="#" />
-                                </p:submenu>
-                                <p:menuitem value="Open" url="#" />
-                                <p:separator />
-                                <p:menuitem value="Quit" url="#" />
-                            </p:submenu>
-
                             <ui:remove>
+                                <p:submenu label="File" icon="ui-icon-document">
+                                    <p:submenu label="New" icon="ui-icon-contact">
+                                        <p:menuitem value="Data Upload" outcome="/upload" />
+                                        <p:menuitem value="Other" url="#" />
+                                    </p:submenu>
+                                    <p:menuitem value="Open" url="#" />
+                                    <p:separator />
+                                    <p:menuitem value="Quit" url="#" />
+                                </p:submenu>
+
+
                                 <p:submenu label="Edit" icon="ui-icon-pencil">
                                     <p:menuitem value="Undo" url="#" icon="ui-icon-arrowreturnthick-1-w" />
                                     <p:menuitem value="Redo" url="#" icon="ui-icon-arrowreturnthick-1-e" />
@@ -93,9 +94,9 @@ limitations under the License.
                     Footer
                 </p:layoutUnit>
 
-                <p:layoutUnit position="west" size="175" header="Left" collapsible="true">
+                <p:layoutUnit position="west" size="175" header="Menu" collapsible="true">
 
-                    <p:button value="HOME" outcome="/index" />
+                    <p:button value="HOME" outcome="/index" icon="ui-icon-home"/>
                 </p:layoutUnit>
 
                 <p:layoutUnit position="center">
