@@ -57,23 +57,26 @@ public class FileLoadView implements Serializable {
      * Handles the file upload
      *
      * @param event
-     * @throws Exception
      */
-    public void handleFileUpload(FileUploadEvent event) throws Exception {
+    public void handleFileUpload(FileUploadEvent event) {
 
-        FacesMessage message = new FacesMessage("Succesful", event.getFile().getFileName() + " is uploaded.");
-        FacesContext.getCurrentInstance().addMessage(null, message);
+        try {
+            FacesMessage message = new FacesMessage("Succesful", event.getFile().getFileName() + " is uploaded.");
+            FacesContext.getCurrentInstance().addMessage(null, message);
 
 //            Access the uploaded file from memory
-        this.excelFile = (FileInputStream) event.getFile().getInputstream();
+            this.excelFile = (FileInputStream) event.getFile().getInputstream();
 
 //        Convert the file to Excel format and populate pattern map
-        Map<Long, Pattern> patternMap = readExcel();
+            Map<Long, Pattern> patternMap = readExcel();
 
 //        Write data patterns to the data base
-        addPattern(patternMap);
+            addPattern(patternMap);
 
-        LOGGER.info("Data written to Neo4j DB.");
+            LOGGER.info("Data written to Neo4j DB.");
+        } catch (IOException ex) {
+            LOGGER.error("Exception handleFileUpload method {}", ex);
+        }
     }
 
     /**

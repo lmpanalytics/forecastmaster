@@ -22,8 +22,8 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import javax.enterprise.context.SessionScoped;
 import javax.annotation.PostConstruct;
+import javax.enterprise.context.RequestScoped;
 import javax.inject.Inject;
 import javax.inject.Named;
 import org.neo4j.driver.v1.Record;
@@ -47,7 +47,7 @@ import se.bigdatamining.forecastmaster.Neo4jBean;
  * @author Magnus Palm
  */
 @Named(value = "actualDataBean")
-@SessionScoped
+@RequestScoped // Will refresh on F5
 public class ActualDataBean implements Serializable {
 
     @Inject
@@ -60,7 +60,7 @@ public class ActualDataBean implements Serializable {
     // ADD CLASS SPECIFIC MAPS AND FIELDS HERE
     private Map<LocalDate, ChartData> actDataMap;
 
-    private LineChartModel lineModel2;
+    private LineChartModel lineModel;
 
     @PostConstruct
     public void init() {
@@ -79,16 +79,15 @@ public class ActualDataBean implements Serializable {
         createLineModels();
     }
 
-    public LineChartModel getLineModel2() {
-        return lineModel2;
+    public LineChartModel getLineModel() {
+        return lineModel;
     }
 
     /**
      * Populates actDataMap with data from database
      *
-     * Invoke after push button
      */
-    private void populateActDataMap() {
+    public void populateActDataMap() {
         try {
 
             String tx = "MATCH (p:Pattern)-[:OWNED_BY]->(c:Customer {customerNumber:$custNo}) RETURN p.msEpoch AS ms, p.respVar0 AS respVar0 ORDER BY ms";
@@ -116,12 +115,12 @@ public class ActualDataBean implements Serializable {
 
     private void createLineModels() {
 
-        lineModel2 = initCategoryModel();
-        lineModel2.setTitle("Historical Data");
-        lineModel2.setLegendPosition("nw");
-        lineModel2.getAxes().put(AxisType.X, new DateAxis("Date"));
-        Axis yAxis = lineModel2.getAxis(AxisType.Y);
-        yAxis = lineModel2.getAxis(AxisType.Y);
+        lineModel = initCategoryModel();
+        lineModel.setTitle("Historical Data");
+        lineModel.setLegendPosition("nw");
+        lineModel.getAxes().put(AxisType.X, new DateAxis("Date"));
+        Axis yAxis = lineModel.getAxis(AxisType.Y);
+        yAxis = lineModel.getAxis(AxisType.Y);
         yAxis.setLabel("Value");
     }
 
