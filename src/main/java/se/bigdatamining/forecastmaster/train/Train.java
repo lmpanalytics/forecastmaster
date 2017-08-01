@@ -91,26 +91,29 @@ import se.bigdatamining.forecastmaster.Neo4jBean;
 @Named(value = "train")
 @SessionScoped
 public class Train implements Serializable {
-
+    
     @Inject
     Neo4jBean neo4jBean;
-
+    
+    @Inject
+    ProgressBarView progressBarView;
+    
     private static final long serialVersionUID = 1L;
     private static final Logger LOGGER = LoggerFactory.getLogger(Train.class);
     private static Session session;
-
+    
     @PostConstruct
     public void init() {
         // INITIATE CLASS SPECIFIC MAPS AND FIELDS HERE - THE ORDER IS IMPORTANT
 
         // Initialize driver
         this.session = neo4jBean.getDRIVER().session();
-
+        
     }
 
     // (for development purpose) Roll 'Predicted test data' series forward in plot
     private static final int SLIDE = 0;
-
+    
     private static File initBaseFile(String fileName) {
         try {
             return new ClassPathResource(fileName).getFile();
@@ -118,7 +121,7 @@ public class Train implements Serializable {
             throw new Error(e);
         }
     }
-
+    
     private static File baseDir = initBaseFile("/rnnRegression");
     private static File baseTrainDir = new File(baseDir, "multiTimestepTrain");
     private static File featuresDirTrain = new File(baseTrainDir, "features");
@@ -126,12 +129,12 @@ public class Train implements Serializable {
     private static File baseTestDir = new File(baseDir, "multiTimestepTest");
     private static File featuresDirTest = new File(baseTestDir, "features");
     private static File labelsDirTest = new File(baseTestDir, "labels");
-
+    
     private static int numOfVariables = 0;  // in csv.
 
 //    public static void main(String[] args) throws Exception {
     public void doTraining() throws Exception {
-
+        
         LOGGER.info("Using AbsolutePath: " + baseDir.getAbsolutePath());
 
         //Set number of examples for training, testing, and time steps
@@ -151,7 +154,7 @@ public class Train implements Serializable {
         trainFeatures.initialize(new NumberedFileInputSplit(featuresDirTrain.getAbsolutePath() + "/train_%d.csv", 0, trainSize - 1));
         SequenceRecordReader trainLabels = new CSVSequenceRecordReader();
         trainLabels.initialize(new NumberedFileInputSplit(labelsDirTrain.getAbsolutePath() + "/train_%d.csv", 0, trainSize - 1));
-
+        
         DataSetIterator trainDataIter = new SequenceRecordReaderDataSetIterator(trainFeatures, trainLabels, miniBatchSize, -1, true, SequenceRecordReaderDataSetIterator.AlignmentMode.ALIGN_END);
 
         //Normalize the training data
@@ -159,7 +162,7 @@ public class Train implements Serializable {
         normalizer.fitLabel(true);
         normalizer.fit(trainDataIter);              //Collect training data statistics
         trainDataIter.reset();
-
+        
         LOGGER.info("*****SAVE FITTED NORMALIZER*****");
 
         // Where to save normalizer
@@ -177,9 +180,9 @@ public class Train implements Serializable {
         testFeatures.initialize(new NumberedFileInputSplit(featuresDirTest.getAbsolutePath() + "/test_%d.csv", trainSize, trainSize + testSize - 1));
         SequenceRecordReader testLabels = new CSVSequenceRecordReader();
         testLabels.initialize(new NumberedFileInputSplit(labelsDirTest.getAbsolutePath() + "/test_%d.csv", trainSize, trainSize + testSize - 1));
-
+        
         DataSetIterator testDataIter = new SequenceRecordReaderDataSetIterator(testFeatures, testLabels, miniBatchSize, -1, true, SequenceRecordReaderDataSetIterator.AlignmentMode.ALIGN_END);
-
+        
         trainDataIter.setPreProcessor(normalizer);
         testDataIter.setPreProcessor(normalizer);
 
@@ -197,20 +200,20 @@ public class Train implements Serializable {
                 .layer(1, new RnnOutputLayer.Builder(LossFunctions.LossFunction.MSE)
                         .activation(Activation.IDENTITY).nIn(10).nOut(numOfVariables).build())
                 .build();
-
+        
         MultiLayerNetwork net = new MultiLayerNetwork(conf);
         net.init();
-
+        
         net.setListeners(new ScoreIterationListener(20));
 
         // ----- Train the network, evaluating the test set performance at each epoch -----
         int nEpochs = 50;
-
+        
         for (int i = 0; i < nEpochs; i++) {
             net.fit(trainDataIter);
             trainDataIter.reset();
             LOGGER.info("Epoch " + i + " complete. Time series evaluation:");
-
+            
             RegressionEvaluation evaluation = new RegressionEvaluation(numOfVariables);
 
             //Run evaluation. This is on 25k reviews, so can take some time
@@ -219,14 +222,14 @@ public class Train implements Serializable {
                 INDArray features = t.getFeatureMatrix();
                 INDArray labels = t.getLabels();
                 INDArray predicted = net.output(features, true);
-
+                
                 evaluation.evalTimeSeries(labels, predicted);
             }
-
+            
             System.out.println(evaluation.stats());
             testDataIter.reset();
         }
-
+        
         LOGGER.info("*****SAVE TRAINED MODEL*****");
         // Details
 
@@ -235,7 +238,7 @@ public class Train implements Serializable {
 
         // boolean save Updater
         boolean saveUpdater = false;
-
+        
         ModelSerializer.writeModel(net, locationToSave, saveUpdater);
 
         /*
@@ -251,7 +254,7 @@ public class Train implements Serializable {
 // export to file / DB
         Map<String, INDArray> state = net.rnnGetPreviousState(0);
         exportStateFile(state);
-
+        
         trainDataIter.reset();
 
         // Predict test data using the rnnTimeStep method
@@ -272,6 +275,7 @@ public class Train implements Serializable {
         createSeries(c, predicted, trainSize + 1 + SLIDE, "Predicted test data");
 
 //        plotDataset(c);
+        progressBarView.setProgress(100);
         LOGGER.info("----- Example Complete -----");
     }
 
@@ -280,7 +284,7 @@ public class Train implements Serializable {
      */
     private static INDArray createIndArrayFromStringList(List<String> rawStrings, int startIndex, int length) {
         List<String> stringList = rawStrings.subList(startIndex, startIndex + length);
-
+        
         double[][] primitives = new double[numOfVariables][stringList.size()];
         for (int i = 0; i < stringList.size(); i++) {
             String[] vals = stringList.get(i).split(",");
@@ -288,7 +292,7 @@ public class Train implements Serializable {
                 primitives[j][i] = Double.valueOf(vals[j]);
             }
         }
-
+        
         return Nd4j.create(new int[]{1, length}, primitives);
     }
 
@@ -298,7 +302,7 @@ public class Train implements Serializable {
     private static void createSeries(XYSeriesCollection seriesCollection, INDArray data, int offset, String name) {
         int nRows = data.shape()[2];
         boolean predicted = name.startsWith("Predicted");
-
+        
         XYSeries series = new XYSeries(name);
         // temp hack to accomodate single column case
         if (numOfVariables == 1) {
@@ -321,7 +325,7 @@ public class Train implements Serializable {
      * Generate an xy plot of the datasets provided.
      */
     private static void plotDataset(XYSeriesCollection c) {
-
+        
         String title = "Regression example";
         String xAxisLabel = "Timestep";
         String yAxisLabel = "Number of passengers";
@@ -337,15 +341,15 @@ public class Train implements Serializable {
         // Auto zoom to fit time series in initial window
         final NumberAxis rangeAxis = (NumberAxis) plot.getRangeAxis();
         rangeAxis.setAutoRange(true);
-
+        
         JPanel panel = new ChartPanel(chart);
-
+        
         JFrame f = new JFrame();
         f.add(panel);
         f.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         f.pack();
         f.setTitle("Training Data");
-
+        
         RefineryUtilities.centerFrameOnScreen(f);
         f.setVisible(true);
     }
@@ -361,7 +365,7 @@ public class Train implements Serializable {
      * @throws IOException
      */
     private static List<String> prepareTrainAndTest(int trainSize, int testSize, int numberOfTimesteps) throws IOException {
-
+        
         Path rawPath = Paths.get(baseDir.getAbsolutePath() + "/data_0000000001_raw.csv");
 
         //Remove data files before generating new one from database
@@ -380,7 +384,7 @@ public class Train implements Serializable {
                 } else {
                     LOGGER.error("Delete data file {} ", f.toPath().toAbsolutePath().toString());
                 }
-
+                
             }
         }
 
@@ -389,12 +393,12 @@ public class Train implements Serializable {
         FileUtils.cleanDirectory(labelsDirTrain);
         FileUtils.cleanDirectory(featuresDirTest);
         FileUtils.cleanDirectory(labelsDirTest);
-
+        
         generateDataFile(rawPath);
-
+        
         List<String> rawStrings = Files.readAllLines(rawPath, Charset.defaultCharset());
         setNumOfVariables(rawStrings);
-
+        
         for (int i = 0; i < trainSize; i++) {
             Path featuresPath = Paths.get(featuresDirTrain.getAbsolutePath() + "/train_" + i + ".csv");
             Path labelsPath = Paths.get(labelsDirTrain + "/train_" + i + ".csv");
@@ -403,7 +407,7 @@ public class Train implements Serializable {
             }
             Files.write(labelsPath, rawStrings.get(i + numberOfTimesteps).concat(System.lineSeparator()).getBytes(), StandardOpenOption.APPEND, StandardOpenOption.CREATE);
         }
-
+        
         for (int i = trainSize; i < testSize + trainSize; i++) {
             Path featuresPath = Paths.get(featuresDirTest + "/test_" + i + ".csv");
             Path labelsPath = Paths.get(labelsDirTest + "/test_" + i + ".csv");
@@ -412,10 +416,10 @@ public class Train implements Serializable {
             }
             Files.write(labelsPath, rawStrings.get(i + numberOfTimesteps).concat(System.lineSeparator()).getBytes(), StandardOpenOption.APPEND, StandardOpenOption.CREATE);
         }
-
+        
         return rawStrings;
     }
-
+    
     private static void setNumOfVariables(List<String> rawStrings) {
         numOfVariables = rawStrings.get(0).split(",").length;
     }
@@ -455,15 +459,15 @@ public class Train implements Serializable {
             String fileName = rawPath.getFileName().toString();
             int idx = fileName.indexOf("_");
             String customerNumber = fileName.substring(idx + 1, idx + 11);
-
+            
             String tx = "MATCH (p:Pattern)-[:OWNED_BY]->(c:Customer {customerNumber:$custNo}) RETURN p.msEpoch AS ms, p.respVar0 AS respVar0 ORDER BY ms";
-
+            
             StatementResult result = session.run(tx, Values.parameters(
                     "custNo", customerNumber
             ));
             while (result.hasNext()) {
                 Record next = result.next();
-
+                
                 String respVar0 = Double.toString(next.get("respVar0").asDouble());
 
                 // Add results to data file unique to the customer
@@ -476,5 +480,5 @@ public class Train implements Serializable {
             LOGGER.error("IOException in 'generateCSV' {}", ex);
         }
     }
-
+    
 }

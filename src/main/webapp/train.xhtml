@@ -26,7 +26,7 @@ limitations under the License.
         <h:head>
             <f:facet name="first">
                 <meta content='text/html; charset=UTF-8' http-equiv="Content-Type"/>
-                <title>Upload</title>
+                <title>Train</title>
             </f:facet>
         </h:head>
 
@@ -98,7 +98,9 @@ limitations under the License.
                     <h:form>
                         <p:menu>
                             <p:submenu label="Resources">
-                                <p:menuitem value="Train" action="#{train.doTraining()}" icon="ui-icon-star" />
+                                <p:menuitem value="Train" onclick="PF('pbAjax').start();" action="#{train.doTraining}" icon="ui-icon-star">
+                                    <f:actionListener binding="#{progressBarView.cancel()}" />
+                                </p:menuitem>
 
                             </p:submenu>
 
@@ -108,17 +110,20 @@ limitations under the License.
                 </p:layoutUnit>
 
                 <p:layoutUnit position="center">
-                    <h:form>                         
-                        <p:fileUpload fileUploadListener="#{fileLoadView.handleFileUpload}" mode="advanced" dragDropSupport="false"
-                                      update="@all" sizeLimit="1000000" fileLimit="1" allowTypes="/(\.|\/)(xlsx)$/" />
+                    <h:form>   
+                        <p:growl id="growl" />
 
-                        <p:growl id="messages" showDetail="true" />
 
-                    </h:form>
+                        <h4>Training Progress Bar</h4>
+                        <p:progressBar widgetVar="pbAjax" ajax="true" value="#{progressBarView.progress}" labelTemplate="{value}%" styleClass="animated" global="false">
+                            <p:ajax event="complete" listener="#{progressBarView.onComplete}" update="growl" />
+                        </p:progressBar>
+                        <br /><br />
+                    </h:form>                        
 
                     <h:form>
                         <p:chart type="line" model="#{actualDataBean.lineModel}" style="height:300px;" responsive="true" id="actChart"/> 
-                    </h:form>                   
+                    </h:form>   
                 </p:layoutUnit>
             </p:layout>
 
