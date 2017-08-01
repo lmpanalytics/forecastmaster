@@ -60,7 +60,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.PostConstruct;
@@ -69,7 +68,11 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import org.deeplearning4j.util.ModelSerializer;
 import org.nd4j.linalg.dataset.api.preprocessor.serializer.NormalizerSerializer;
+import org.neo4j.driver.v1.Record;
 import org.neo4j.driver.v1.Session;
+import org.neo4j.driver.v1.StatementResult;
+import org.neo4j.driver.v1.Values;
+import org.neo4j.driver.v1.exceptions.ClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.bigdatamining.forecastmaster.Neo4jBean;
@@ -94,7 +97,7 @@ public class Train implements Serializable {
 
     private static final long serialVersionUID = 1L;
     private static final Logger LOGGER = LoggerFactory.getLogger(Train.class);
-    private Session session;
+    private static Session session;
 
     @PostConstruct
     public void init() {
@@ -249,9 +252,6 @@ public class Train implements Serializable {
         Map<String, INDArray> state = net.rnnGetPreviousState(0);
         exportStateFile(state);
 
-        //        Get the rnn configuration and export to file / DB
-        /*String rnnConf = net.conf().toYaml();
-        exportConfigFile(rnnConf);*/
         trainDataIter.reset();
 
         // Predict test data using the rnnTimeStep method
@@ -272,7 +272,6 @@ public class Train implements Serializable {
         createSeries(c, predicted, trainSize + 1 + SLIDE, "Predicted test data");
 
 //        plotDataset(c);
-
         LOGGER.info("----- Example Complete -----");
     }
 
@@ -362,16 +361,39 @@ public class Train implements Serializable {
      * @throws IOException
      */
     private static List<String> prepareTrainAndTest(int trainSize, int testSize, int numberOfTimesteps) throws IOException {
-        Path rawPath = Paths.get(baseDir.getAbsolutePath() + "/passengers_raw.csv");
 
-        List<String> rawStrings = Files.readAllLines(rawPath, Charset.defaultCharset());
-        setNumOfVariables(rawStrings);
+        Path rawPath = Paths.get(baseDir.getAbsolutePath() + "/data_0000000001_raw.csv");
+
+        //Remove data files before generating new one from database
+        // List all files in baseDir folder
+        File folder = new File(baseDir.getAbsolutePath());
+        File fList[] = folder.listFiles();
+        // Searches .csv
+        for (int i = 0; i < fList.length; i++) {
+            File f = fList[i];
+            if (f.getName().endsWith("raw.csv")) {
+                // and deletes
+                File target = fList[i];
+                boolean success = target.delete();
+                if (success) {
+                    LOGGER.info("Deleted data file {} ", f.toPath().toAbsolutePath().toString());
+                } else {
+                    LOGGER.error("Delete data file {} ", f.toPath().toAbsolutePath().toString());
+                }
+
+            }
+        }
 
         //Remove all files before generating new ones
         FileUtils.cleanDirectory(featuresDirTrain);
         FileUtils.cleanDirectory(labelsDirTrain);
         FileUtils.cleanDirectory(featuresDirTest);
         FileUtils.cleanDirectory(labelsDirTest);
+
+        generateDataFile(rawPath);
+
+        List<String> rawStrings = Files.readAllLines(rawPath, Charset.defaultCharset());
+        setNumOfVariables(rawStrings);
 
         for (int i = 0; i < trainSize; i++) {
             Path featuresPath = Paths.get(featuresDirTrain.getAbsolutePath() + "/train_" + i + ".csv");
@@ -416,6 +438,42 @@ public class Train implements Serializable {
             LOGGER.error("File not found. {}", e);
         } catch (IOException e) {
             LOGGER.error("Error initializing stream. {}", e);
+        }
+    }
+
+    /**
+     * Queries database for customer's raw data. Writes a csv data file unique
+     * to the customer incorporating the customer number in the file name, like
+     * so 'data_0000000001_raw.csv'.
+     *
+     * @param rawPath to the file location
+     */
+    private static void generateDataFile(Path rawPath) {
+        try {
+
+            // Extract the customer number from the raw path
+            String fileName = rawPath.getFileName().toString();
+            int idx = fileName.indexOf("_");
+            String customerNumber = fileName.substring(idx + 1, idx + 11);
+
+            String tx = "MATCH (p:Pattern)-[:OWNED_BY]->(c:Customer {customerNumber:$custNo}) RETURN p.msEpoch AS ms, p.respVar0 AS respVar0 ORDER BY ms";
+
+            StatementResult result = session.run(tx, Values.parameters(
+                    "custNo", customerNumber
+            ));
+            while (result.hasNext()) {
+                Record next = result.next();
+
+                String respVar0 = Double.toString(next.get("respVar0").asDouble());
+
+                // Add results to data file unique to the customer
+                Files.write(rawPath, respVar0.concat(System.lineSeparator()).getBytes(), StandardOpenOption.APPEND, StandardOpenOption.CREATE);
+            }
+            LOGGER.info("SUCCESS: Wrote CSV data file {}", rawPath);
+        } catch (ClientException e) {
+            LOGGER.error("ClientException in 'generateCSV' {}", e);
+        } catch (IOException ex) {
+            LOGGER.error("IOException in 'generateCSV' {}", ex);
         }
     }
 
