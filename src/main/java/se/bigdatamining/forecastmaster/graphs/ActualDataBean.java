@@ -59,8 +59,12 @@ public class ActualDataBean implements Serializable {
 
     // ADD CLASS SPECIFIC MAPS AND FIELDS HERE
     private Map<LocalDate, ChartData> actDataMap;
+    private Map<LocalDate, ChartData> predDataMap;
+    private Map<LocalDate, ChartData> fcDataMap;
 
     private LineChartModel lineModel;
+    private LineChartModel lineModelPredict;
+    private LineChartModel lineModelForecast;
 
     @PostConstruct
     public void init() {
@@ -69,11 +73,23 @@ public class ActualDataBean implements Serializable {
         // Initialize driver
         this.session = neo4jBean.getDRIVER().session();
 
-        // Initialize the actDataMap
+        // Initialize the Actual values Data Map
         this.actDataMap = new LinkedHashMap<>();
 
-        // Populate actDataMap with data from database
+        // Initialize the Predicted values Data Map
+        this.predDataMap = new LinkedHashMap<>();
+
+        // Initialize the Forecast values Data Map
+        this.fcDataMap = new LinkedHashMap<>();
+
+        // Populate Actual values Data Map with data from database
         populateActDataMap();
+
+        // Populate Predicted values Data Map with data from database
+        populatePredDataMap();
+
+        // Populate Forecast values Data Map with data from database
+        populateFcDataMap();
 
         // Create the line models
         createLineModels();
@@ -81,6 +97,14 @@ public class ActualDataBean implements Serializable {
 
     public LineChartModel getLineModel() {
         return lineModel;
+    }
+
+    public LineChartModel getLineModelPredict() {
+        return lineModelPredict;
+    }
+
+    public LineChartModel getLineModelForecast() {
+        return lineModelForecast;
     }
 
     /**
@@ -113,6 +137,43 @@ public class ActualDataBean implements Serializable {
         }
     }
 
+    /**
+     * Populates predDataMap with data from database
+     */
+    private void populatePredDataMap() {
+        try {
+
+            String tx = "MATCH (pr:Prediction)-[:PREDICTED_FOR]->(p:Pattern)-[:OWNED_BY]->(c:Customer {customerNumber:$custNo}) RETURN p.msEpoch AS ms, pr.predicted AS pred ORDER BY ms";
+
+            StatementResult result = this.session.run(tx, Values.parameters(
+                    "custNo", "0000000001"
+            ));
+
+            while (result.hasNext()) {
+                Record next = result.next();
+
+                Long ms = next.get("ms").asLong();
+                double predictedValue = next.get("pred").asDouble();
+
+                LocalDate date = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault()).toLocalDate();
+
+                // Add results to Map
+                predDataMap.put(date, new ChartData(date, predictedValue));
+            }
+            LOGGER.info("SUCCESS: Added chart data to predDataMap");
+        } catch (ClientException e) {
+            LOGGER.error("Exception in 'populatePredDataMap' {}", e);
+        }
+    }
+
+    /**
+     * Populates fcDataMap with data from database
+     */
+    private void populateFcDataMap() {
+
+        // Add code
+    }
+
     private void createLineModels() {
 
         lineModel = initCategoryModel();
@@ -121,6 +182,14 @@ public class ActualDataBean implements Serializable {
         lineModel.getAxes().put(AxisType.X, new DateAxis("Date"));
         Axis yAxis = lineModel.getAxis(AxisType.Y);
         yAxis = lineModel.getAxis(AxisType.Y);
+        yAxis.setLabel("Value");
+
+        lineModelPredict = initCategoryModelPred();
+        lineModelPredict.setTitle("Historical and Predicted Data Fit");
+        lineModelPredict.setLegendPosition("nw");
+        lineModelPredict.getAxes().put(AxisType.X, new DateAxis("Date"));
+        yAxis = lineModelPredict.getAxis(AxisType.Y);
+        yAxis = lineModelPredict.getAxis(AxisType.Y);
         yAxis.setLabel("Value");
     }
 
@@ -144,6 +213,45 @@ public class ActualDataBean implements Serializable {
 
         // Add the first series
         model.addSeries(actual);
+        // Add additional series ...
+
+        return model;
+    }
+
+    private LineChartModel initCategoryModelPred() {
+        LineChartModel model = new LineChartModel();
+
+        ChartSeries actual = new ChartSeries();
+        ChartSeries predicted = new ChartSeries();
+
+        actDataMap.entrySet().stream().forEach((entry) -> {
+            LocalDate key = entry.getKey();
+            ChartData value = entry.getValue();
+
+            // Transform date to date format
+            String chartDate = key.format(DateTimeFormatter.ISO_DATE);
+
+            // add data to actual data series
+            actual.set(chartDate, value.getResponeVar0());
+        });
+        
+        predDataMap.entrySet().stream().forEach((entry) -> {
+            LocalDate key = entry.getKey();
+            ChartData value = entry.getValue();
+
+            // Transform date to date format
+            String chartDate = key.format(DateTimeFormatter.ISO_DATE);
+
+            // add data to predicted data series
+            predicted.set(chartDate, value.getResponeVar0() /* This is the predicted value */);
+        });
+
+        actual.setLabel("Actual Data");
+        predicted.setLabel("Predicted test data");
+
+        // Add the first series
+        model.addSeries(actual);
+        model.addSeries(predicted);
         // Add additional series ...
 
         return model;

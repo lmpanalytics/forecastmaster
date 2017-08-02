@@ -98,7 +98,7 @@ limitations under the License.
                     <h:form>
                         <p:menu>
                             <p:submenu label="Resources">
-                                <p:menuitem value="Train" onclick="PF('pbAjax').start();" action="#{train.doTraining}" icon="ui-icon-star">
+                                <p:menuitem value="Train" onclick="PF('pbAjax').start();" action="#{train.doTraining}" icon="ui-icon-star" update="@all">
                                     <f:actionListener binding="#{progressBarView.cancel()}" />
                                 </p:menuitem>
 
@@ -122,7 +122,7 @@ limitations under the License.
                     </h:form>                        
 
                     <h:form>
-                        <p:chart type="line" model="#{actualDataBean.lineModel}" style="height:300px;" responsive="true" id="actChart"/> 
+                        <p:chart type="line" model="#{actualDataBean.lineModelPredict}" style="height:300px;" responsive="true" id="predChart"/> 
                     </h:form>   
                 </p:layoutUnit>
             </p:layout>
