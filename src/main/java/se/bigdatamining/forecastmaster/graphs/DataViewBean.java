@@ -46,15 +46,15 @@ import se.bigdatamining.forecastmaster.Neo4jBean;
  *
  * @author Magnus Palm
  */
-@Named(value = "actualDataBean")
+@Named(value = "dataViewBean")
 @RequestScoped // Will refresh on F5
-public class ActualDataBean implements Serializable {
+public class DataViewBean implements Serializable {
 
     @Inject
     Neo4jBean neo4jBean;
 
     private static final long serialVersionUID = 1L;
-    private static final Logger LOGGER = LoggerFactory.getLogger(ActualDataBean.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(DataViewBean.class);
     private Session session;
 
     // ADD CLASS SPECIFIC MAPS AND FIELDS HERE
@@ -62,7 +62,7 @@ public class ActualDataBean implements Serializable {
     private Map<LocalDate, ChartData> predDataMap;
     private Map<LocalDate, ChartData> fcDataMap;
 
-    private LineChartModel lineModel;
+    private LineChartModel lineModelActual;
     private LineChartModel lineModelPredict;
     private LineChartModel lineModelForecast;
 
@@ -95,8 +95,8 @@ public class ActualDataBean implements Serializable {
         createLineModels();
     }
 
-    public LineChartModel getLineModel() {
-        return lineModel;
+    public LineChartModel getLineModelActual() {
+        return lineModelActual;
     }
 
     public LineChartModel getLineModelPredict() {
@@ -176,12 +176,12 @@ public class ActualDataBean implements Serializable {
 
     private void createLineModels() {
 
-        lineModel = initCategoryModel();
-        lineModel.setTitle("Historical Data");
-        lineModel.setLegendPosition("nw");
-        lineModel.getAxes().put(AxisType.X, new DateAxis("Date"));
-        Axis yAxis = lineModel.getAxis(AxisType.Y);
-        yAxis = lineModel.getAxis(AxisType.Y);
+        lineModelActual = initCategoryModelAct();
+        lineModelActual.setTitle("Historical Data");
+        lineModelActual.setLegendPosition("nw");
+        lineModelActual.getAxes().put(AxisType.X, new DateAxis("Date"));
+        Axis yAxis = lineModelActual.getAxis(AxisType.Y);
+        yAxis = lineModelActual.getAxis(AxisType.Y);
         yAxis.setLabel("Value");
 
         lineModelPredict = initCategoryModelPred();
@@ -193,7 +193,7 @@ public class ActualDataBean implements Serializable {
         yAxis.setLabel("Value");
     }
 
-    private LineChartModel initCategoryModel() {
+    private LineChartModel initCategoryModelAct() {
         LineChartModel model = new LineChartModel();
 
         ChartSeries actual = new ChartSeries();
