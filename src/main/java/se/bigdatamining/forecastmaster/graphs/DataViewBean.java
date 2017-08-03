@@ -20,6 +20,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import static java.time.temporal.ChronoUnit.DAYS;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.annotation.PostConstruct;
@@ -39,6 +41,7 @@ import org.primefaces.model.chart.DateAxis;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.bigdatamining.forecastmaster.Neo4jBean;
+import se.bigdatamining.forecastmaster.query.QueryBean;
 
 /**
  * This class provides plotting service for the actual loaded data, i.e., it
@@ -52,6 +55,9 @@ public class DataViewBean implements Serializable {
 
     @Inject
     Neo4jBean neo4jBean;
+
+    @Inject
+    QueryBean query;
 
     private static final long serialVersionUID = 1L;
     private static final Logger LOGGER = LoggerFactory.getLogger(DataViewBean.class);
@@ -171,7 +177,23 @@ public class DataViewBean implements Serializable {
      */
     private void populateFcDataMap() {
 
-        // Add code
+        // Calculate the average time period and use that as time periods for t+1, t+2, ..., t+n
+        LocalDate lastEntry = Collections.max(actDataMap.keySet());
+        LocalDate firstEntry = Collections.min(actDataMap.keySet());
+        long daysBetween = DAYS.between(firstEntry, lastEntry);
+        long increment = daysBetween / actDataMap.size(); // averagePeriod
+
+        // Call the future time predictions from the Query
+        long days = 0L;
+        double[] fcArray = query.getForecasts();
+        for (int i = 0; i < fcArray.length; i++) {
+            double prediction = fcArray[i];
+            // Put in the fcDataMap
+            days = days + increment;
+            LocalDate date = lastEntry.plusDays(days);
+            fcDataMap.put(date, new ChartData(date, prediction));
+        }
+
     }
 
     private void createLineModels() {
@@ -190,6 +212,14 @@ public class DataViewBean implements Serializable {
         lineModelPredict.getAxes().put(AxisType.X, new DateAxis("Date"));
         yAxis = lineModelPredict.getAxis(AxisType.Y);
         yAxis = lineModelPredict.getAxis(AxisType.Y);
+        yAxis.setLabel("Value");
+
+        lineModelForecast = initCategoryModelFC();
+        lineModelForecast.setTitle("Historical and Forecast Data");
+        lineModelForecast.setLegendPosition("nw");
+        lineModelForecast.getAxes().put(AxisType.X, new DateAxis("Date"));
+        yAxis = lineModelForecast.getAxis(AxisType.Y);
+        yAxis = lineModelForecast.getAxis(AxisType.Y);
         yAxis.setLabel("Value");
     }
 
@@ -234,7 +264,7 @@ public class DataViewBean implements Serializable {
             // add data to actual data series
             actual.set(chartDate, value.getResponeVar0());
         });
-        
+
         predDataMap.entrySet().stream().forEach((entry) -> {
             LocalDate key = entry.getKey();
             ChartData value = entry.getValue();
@@ -252,6 +282,45 @@ public class DataViewBean implements Serializable {
         // Add the first series
         model.addSeries(actual);
         model.addSeries(predicted);
+        // Add additional series ...
+
+        return model;
+    }
+
+    private LineChartModel initCategoryModelFC() {
+        LineChartModel model = new LineChartModel();
+
+        ChartSeries actual = new ChartSeries();
+        ChartSeries forecast = new ChartSeries();
+
+        actDataMap.entrySet().stream().forEach((entry) -> {
+            LocalDate key = entry.getKey();
+            ChartData value = entry.getValue();
+
+            // Transform date to date format
+            String chartDate = key.format(DateTimeFormatter.ISO_DATE);
+
+            // add data to actual data series
+            actual.set(chartDate, value.getResponeVar0());
+        });
+
+        fcDataMap.entrySet().stream().forEach((entry) -> {
+            LocalDate key = entry.getKey();
+            ChartData value = entry.getValue();
+
+            // Transform date to date format
+            String chartDate = key.format(DateTimeFormatter.ISO_DATE);
+
+            // add data to forecast data series
+            forecast.set(chartDate, value.getResponeVar0() /* This is the forecast value */);
+        });
+
+        actual.setLabel("Actual Data");
+        forecast.setLabel("Forecast");
+
+        // Add the first series
+        model.addSeries(actual);
+        model.addSeries(forecast);
         // Add additional series ...
 
         return model;

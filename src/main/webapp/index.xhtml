@@ -22,6 +22,7 @@ limitations under the License.
       xmlns:p="http://primefaces.org/ui">
 
     <f:view contentType="text/html">
+
         <h:head>
             <f:facet name="first">
                 <meta content='text/html; charset=UTF-8' http-equiv="Content-Type"/>
@@ -30,7 +31,6 @@ limitations under the License.
         </h:head>
 
         <h:body>
-
             <p:layout fullPage="true">
 
                 <p:layoutUnit position="north" size="200" resizable="true" closable="true" collapsible="true">
@@ -114,7 +114,9 @@ limitations under the License.
                 </p:layoutUnit>
 
                 <p:layoutUnit position="center">
-                    Add plot graph of sales as a function of time
+                    <h:form>
+                        <p:chart type="line" model="#{dataViewBean.lineModelForecast}" style="height:300px;" responsive="true" id="fcChart"/> 
+                    </h:form>
                 </p:layoutUnit>
 
             </p:layout>
