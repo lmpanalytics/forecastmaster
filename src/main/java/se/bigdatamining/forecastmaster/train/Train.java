@@ -122,7 +122,7 @@ public class Train implements Serializable {
         this.session = neo4jBean.getDRIVER().session();
 
         // Set solver fields
-        solver.setRawDataSize(new Long(143)); // <<<====== FIX THIS !!
+        solver.setRawDataSize(queryRawDataSizeDB());
         solver.setNumberOfTimesteps(new Long(numberOfTimesteps));
 
         // Call solver to solve for the above inputs
@@ -557,6 +557,36 @@ public class Train implements Serializable {
         } else {
             LOGGER.error("Prediction collection is empty.");
         }
+    }
+
+    /**
+     * Query the Database for the number of patterns in the rawdata for a
+     * specific customer. The size is used as input for the solver.
+     *
+     * @return size of rawdata
+     */
+    private Long queryRawDataSizeDB() {
+        long count = 0L;
+        try {
+
+            String customerNumber = "0000000001";
+
+            String tx = "MATCH (p:Pattern)-[:OWNED_BY]->(c:Customer {customerNumber:$custNo}) RETURN COUNT(p) AS dataSize";
+
+            StatementResult result = session.run(tx, Values.parameters(
+                    "custNo", customerNumber
+            ));
+            while (result.hasNext()) {
+                Record next = result.next();
+
+                count = next.get("dataSize").asLong();
+
+            }
+        } catch (Exception e) {
+            LOGGER.error("Could not query the Raw Data Size from the DB");
+        }
+
+        return count;
     }
 
     /**
