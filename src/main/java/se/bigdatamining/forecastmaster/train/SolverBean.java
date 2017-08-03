@@ -44,11 +44,11 @@ public class SolverBean {
     private static final double TEST_SHARE_UL = 20 / 100d /*Upper limit*/;
 
     // Fields initiated by Setters in Training class
-    private static Long rawDataSize = 0L;
+    private Long rawDataSize = 0L;
 
-    private static Long trainSize = 0L;
-    private static Long testSize = 0L;
-    private static Long numberOfTimesteps = 0L /* Looking back, cannot be larger than the training size */;
+    private Long trainSize = 0L;
+    private Long testSize = 0L;
+    private Long numberOfTimesteps = 0L /* Looking back, cannot be larger than the training size */;
 
     // Fields initiated by @PostConstruct
     private static Long miniBatchSize /* Must be divisable by trainSize and testSize  */;
@@ -88,16 +88,16 @@ public class SolverBean {
             // Continue to build the ladder...
             miniBatchSize = 10L;
         }
-
-        solve();
     }
 
     /**
      * Find a solver solution
      */
-    private static boolean solve() {
+    public boolean solve() {
 
-        // ***** 1. Calculate training size *****
+        System.out.println("\nOPTIMIZER SEARCHING...\n------------------------------------------------------------------------");
+
+// ***** 1. Calculate training size *****
         boolean isTrainSizeDivisable = solveTrainingSize();
 
         // ***** 2. Calculate test size *****
@@ -132,7 +132,7 @@ public class SolverBean {
         return isFoundSolution;
     }
 
-    private static boolean checkTimeStepFit() {
+    private boolean checkTimeStepFit() {
 
         boolean isNumberOfTimestepsFit = false;
         if (numberOfTimesteps <= trainSize) {
@@ -154,7 +154,7 @@ public class SolverBean {
         return isNumberOfTimestepsFit;
     }
 
-    private static boolean solveTestSize() {
+    private boolean solveTestSize() {
 
         testSize = Math.round(testShareLL * rawDataSize);
         // Optimize Test Size
@@ -180,7 +180,7 @@ public class SolverBean {
         return isTestSizeDivisable;
     }
 
-    private static boolean solveTrainingSize() {
+    private boolean solveTrainingSize() {
 
         trainSize = Math.round(trainingShareLL * rawDataSize);
         // Optimize Train Size
@@ -206,27 +206,32 @@ public class SolverBean {
         return isTrainSizeDivisable;
     }
 
-    public static void setRawDataSize(Long rawDataSize) {
-        SolverBean.rawDataSize = rawDataSize;
+    public void setRawDataSize(Long rawDataSize) {
+        this.rawDataSize = rawDataSize;
     }
 
-    public static Integer getTrainSize() {
+    public Integer getTrainSize() {
         // Convert from Long to Integer
         return (int) (long) trainSize;
     }
 
-    public static Integer getTestSize() {
+    public Integer getTestSize() {
         // Convert from Long to Integer
         return (int) (long) testSize;
     }
 
-    public static Integer getNumberOfTimesteps() {
+    public Integer getNumberOfTimesteps() {
         // Convert from Long to Integer
         return (int) (long) numberOfTimesteps;
     }
 
-    public static void setNumberOfTimesteps(Long numberOfTimesteps) {
-        SolverBean.numberOfTimesteps = numberOfTimesteps;
+    public void setNumberOfTimesteps(Long numberOfTimesteps) {
+        this.numberOfTimesteps = numberOfTimesteps;
+    }
+
+    public Integer getMiniBatchSize() {
+        // Convert from Long to Integer
+        return (int) (long) miniBatchSize;
     }
 
 }

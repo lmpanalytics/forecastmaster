@@ -101,17 +101,18 @@ public class Train implements Serializable {
     @Inject
     ProgressBarView progressBarView;
 
+    @Inject
+    SolverBean solver;
+
     private static final long serialVersionUID = 1L;
     private static final Logger LOGGER = LoggerFactory.getLogger(Train.class);
     private static Session session;
 
-    //Set number of examples for training, testing, and time steps
-    private static int trainSize = 100;
-    private static int testSize = 20;
-    private static int numberOfTimesteps = 20;
-    //Make sure miniBatchSize is divisable by trainSize and testSize,
-    //as rnnTimeStep will not accept different sized examples
-    private static int miniBatchSize = 10;
+    //Initiate fields for training, testing, and time steps. Set in @PostConstruct.
+    private static int trainSize = 0;
+    private static int testSize = 0;
+    private int numberOfTimesteps = 20; // <<<====== FIX THIS !! (Code as user input from jsf train.xhtml)
+    private static int miniBatchSize = 0;
 
     @PostConstruct
     public void init() {
@@ -120,6 +121,18 @@ public class Train implements Serializable {
         // Initialize driver
         this.session = neo4jBean.getDRIVER().session();
 
+        // Set solver fields
+        solver.setRawDataSize(new Long(143)); // <<<====== FIX THIS !!
+        solver.setNumberOfTimesteps(new Long(numberOfTimesteps));
+
+        // Call solver to solve for the above inputs
+        solver.solve();
+
+        // Get solver fields
+        trainSize = solver.getTrainSize();
+        testSize = solver.getTestSize();
+        numberOfTimesteps = solver.getNumberOfTimesteps();
+        miniBatchSize = solver.getMiniBatchSize();
     }
 
     // (for development purpose) Roll 'Predicted test data' series forward in plot
@@ -298,7 +311,7 @@ public class Train implements Serializable {
         plotDataset(c); */
         // Fast-forward the Training Progress Bar to 100% when training method is ready
         progressBarView.setProgress(100);
-        LOGGER.info("----- Example Complete -----");
+        LOGGER.info("----- Training Complete -----");
     }
 
     /**
@@ -545,4 +558,14 @@ public class Train implements Serializable {
             LOGGER.error("Prediction collection is empty.");
         }
     }
+
+    /**
+     * User input from jsf train.xhtml
+     *
+     * @param numberOfTimesteps
+     */
+    public void setNumberOfTimesteps(int numberOfTimesteps) {
+        this.numberOfTimesteps = numberOfTimesteps;
+    }
+
 }
