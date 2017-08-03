@@ -590,6 +590,29 @@ public class Train implements Serializable {
     }
 
     /**
+     * The 'Previous State' (ps) index poistion is found by equation ps =
+     * trainSize + testSize + miniBatchSize - 1 - 1. The first figure 1 is the
+     * 'label' and the second figure 1 is for index conversion. So what remains
+     * is the index position of the 'Previous State'.
+     *
+     * To mark the sequence position of patterns, i.e. Pattern nodes in Neo4j,
+     * that corresponds to the 'Previous State' add 1 to the ps equation and
+     * that is the node's number sequence.
+     *
+     * Example: ps = 100 + 20 + 10 - 1 - 1 = idx 128. The node holding the
+     * 'Previous State' is number 128 + 1 = 129, counted in sequence from the
+     * earliest time stamped data input in ms, where the first node is node 1,
+     * and so forth.
+     *
+     * @return the index (idx) of the 'Previous State'. Add 1 to get the
+     * sequence number of the Pattern Node, starting count from Node 1.
+     */
+    public int calcPreviousStateIdx() {
+
+        return trainSize + testSize + miniBatchSize - 1 - 1;
+    }
+
+    /**
      * User input from jsf train.xhtml
      *
      * @param numberOfTimesteps
