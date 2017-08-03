@@ -95,7 +95,7 @@ public class SolverBean {
      */
     public boolean solve() {
 
-        System.out.println("\nOPTIMIZER SEARCHING...\n------------------------------------------------------------------------");
+        System.out.println("\nSOLVER WORKING...\n------------------------------------------------------------------------");
 
 // ***** 1. Calculate training size *****
         boolean isTrainSizeDivisable = solveTrainingSize();
@@ -115,18 +115,18 @@ public class SolverBean {
         // ***** 4. Check so Number of Timesteps Fit in Train Size *****
         boolean isNumberOfTimestepsFit = checkTimeStepFit();
 
-        System.out.printf("%n***** FINAL RESULTS *****%nRaw Data Size:\t%s%nTraining size:\t%s%nTest size:\t%s%nValidation size:\t%s%n"
+        System.out.printf("%n***** SOLVER RESULTS *****%nRaw Data Size:\t%s%nTraining size:\t%s%nTest size:\t%s%nValidation size:\t%s%n"
                 + "SumTotal - RawDataSize:\t%s%nNumber of Timesteps:\t%s%nminiBatchSize:\t%s%nDiff to RawData Size is Zero:\t%s%n"
                 + "Number of Timesteps Fit in Train Size:\t%s%nTraining Size is Divisable by MiniBatch:\t%s%n"
-                + "Test Size is Divisable by MiniBatch:\t%s%n",
+                + "Test Size is Divisable by MiniBatch:\t%s%n------------------------------------------------------------------------%n",
                 rawDataSize, trainSize, testSize, validationSize, sumTotal - rawDataSize, numberOfTimesteps, miniBatchSize, isDiffZero, isNumberOfTimestepsFit, isTrainSizeDivisable, isTestSizeDivisable);
 
         // If all booleans are true, return true, else false
         if (isDiffZero && isNumberOfTimestepsFit && isTrainSizeDivisable && isTestSizeDivisable) {
             isFoundSolution = true;
-            LOGGER.info("SUCCESS: Found solution");
+            LOGGER.info("SUCCESS: Solver found solution");
         } else {
-            LOGGER.error("Failed to find solution");
+            LOGGER.error("Solver failed to find solution");
         }
 
         return isFoundSolution;

@@ -109,10 +109,16 @@ public class Train implements Serializable {
     private static Session session;
 
     //Initiate fields for training, testing, and time steps. Set in @PostConstruct.
-    private static int trainSize = 0;
-    private static int testSize = 0;
+    private int trainSize = 0;
+    private int testSize = 0;
     private int numberOfTimesteps = 20; // <<<====== FIX THIS !! (Code as user input from jsf train.xhtml)
-    private static int miniBatchSize = 0;
+    private int miniBatchSize = 0;
+
+    /**
+     * Creates a new instance of Train
+     */
+    public Train() {
+    }
 
     @PostConstruct
     public void init() {
@@ -407,7 +413,7 @@ public class Train implements Serializable {
         // List all files in baseDir folder
         File folder = new File(baseDir.getAbsolutePath());
         File fList[] = folder.listFiles();
-        // Searches .csv
+        // Searches ... raw.csv
         for (int i = 0; i < fList.length; i++) {
             File f = fList[i];
             if (f.getName().endsWith("raw.csv")) {
@@ -612,6 +618,10 @@ public class Train implements Serializable {
         return trainSize + testSize + miniBatchSize - 1 - 1;
     }
 
+    public int getTrainSize() {
+        return trainSize;
+    }
+
     /**
      * User input from jsf train.xhtml
      *
@@ -619,6 +629,14 @@ public class Train implements Serializable {
      */
     public void setNumberOfTimesteps(int numberOfTimesteps) {
         this.numberOfTimesteps = numberOfTimesteps;
+    }
+
+    public int getNumberOfTimesteps() {
+        return numberOfTimesteps;
+    }
+
+    public int getMiniBatchSize() {
+        return miniBatchSize;
     }
 
 }

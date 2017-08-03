@@ -53,8 +53,6 @@ limitations under the License.
                                 <p:menuitem value="Upload" outcome="/upload" />
                                 <p:separator />
                                 <p:menuitem value="Train" outcome="/train" />
-                                <p:separator />
-                                <p:menuitem value="Forecast" url="#" />
                             </p:submenu>
 
                             <ui:remove>
@@ -103,14 +101,16 @@ limitations under the License.
                 </p:layoutUnit>
 
                 <p:layoutUnit position="west" size="175" header="Menu" collapsible="true">
-                    <p:menu>
-                        <p:submenu label="Resources">
-                            <p:menuitem value="Other" url="#" icon="ui-icon-star" />
+                    <h:form>
+                        <p:menu>
+                            <p:submenu label="Resources">
+                                <p:menuitem value="Forecast" action="#{queryBean.doQuery()}" icon="ui-icon-star" update="@all"/>
 
-                        </p:submenu>
+                            </p:submenu>
 
-                    </p:menu>
-                    Replace with data tree?
+                        </p:menu>
+                        Replace with data tree?
+                    </h:form>
                 </p:layoutUnit>
 
                 <p:layoutUnit position="center">
