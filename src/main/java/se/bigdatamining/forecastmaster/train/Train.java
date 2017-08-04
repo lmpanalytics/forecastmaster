@@ -172,138 +172,141 @@ public class Train implements Serializable {
      */
     public void doTraining() throws Exception {
 
-        List<Double> predictions = new LinkedList<>();
+        // Only run if data is present in the DB (new user exception handling)
+        if (queryRawDataSizeDB() > 0) {
 
-        LOGGER.info("Using AbsolutePath: " + baseDir.getAbsolutePath());
+            List<Double> predictions = new LinkedList<>();
 
-        //Prepare multi time step data, see method comments for more info
-        List<String> rawStrings = prepareTrainAndTest(trainSize, testSize, numberOfTimesteps);
+            LOGGER.info("Using AbsolutePath: " + baseDir.getAbsolutePath());
 
-        // ----- Load the training data -----
-        SequenceRecordReader trainFeatures = new CSVSequenceRecordReader();
-        trainFeatures.initialize(new NumberedFileInputSplit(featuresDirTrain.getAbsolutePath() + "/train_%d.csv", 0, trainSize - 1));
-        SequenceRecordReader trainLabels = new CSVSequenceRecordReader();
-        trainLabels.initialize(new NumberedFileInputSplit(labelsDirTrain.getAbsolutePath() + "/train_%d.csv", 0, trainSize - 1));
+            //Prepare multi time step data, see method comments for more info        
+            List<String> rawStrings = prepareTrainAndTest(trainSize, testSize, numberOfTimesteps);
 
-        DataSetIterator trainDataIter = new SequenceRecordReaderDataSetIterator(trainFeatures, trainLabels, miniBatchSize, -1, true, SequenceRecordReaderDataSetIterator.AlignmentMode.ALIGN_END);
+            // ----- Load the training data -----
+            SequenceRecordReader trainFeatures = new CSVSequenceRecordReader();
+            trainFeatures.initialize(new NumberedFileInputSplit(featuresDirTrain.getAbsolutePath() + "/train_%d.csv", 0, trainSize - 1));
+            SequenceRecordReader trainLabels = new CSVSequenceRecordReader();
+            trainLabels.initialize(new NumberedFileInputSplit(labelsDirTrain.getAbsolutePath() + "/train_%d.csv", 0, trainSize - 1));
 
-        //Normalize the training data
-        NormalizerMinMaxScaler normalizer = new NormalizerMinMaxScaler(0, 1);
-        normalizer.fitLabel(true);
-        normalizer.fit(trainDataIter);              //Collect training data statistics
-        trainDataIter.reset();
+            DataSetIterator trainDataIter = new SequenceRecordReaderDataSetIterator(trainFeatures, trainLabels, miniBatchSize, -1, true, SequenceRecordReaderDataSetIterator.AlignmentMode.ALIGN_END);
 
-        LOGGER.info("*****SAVE FITTED NORMALIZER*****");
-
-        // Where to save normalizer
-        File locationToSaveNormalizer = new File("fitted_normalizer.zip");
-
-        // Now we want to save the normalizer to a binary file. For doing this, one can use the NormalizerSerializer.
-        NormalizerSerializer serializer = NormalizerSerializer.getDefault();
-
-        // Save the normalizer to the location to save
-        serializer.write(normalizer, locationToSaveNormalizer);
-
-        // ----- Load the test data -----
-        //Same process as for the training data.
-        SequenceRecordReader testFeatures = new CSVSequenceRecordReader();
-        testFeatures.initialize(new NumberedFileInputSplit(featuresDirTest.getAbsolutePath() + "/test_%d.csv", trainSize, trainSize + testSize - 1));
-        SequenceRecordReader testLabels = new CSVSequenceRecordReader();
-        testLabels.initialize(new NumberedFileInputSplit(labelsDirTest.getAbsolutePath() + "/test_%d.csv", trainSize, trainSize + testSize - 1));
-
-        DataSetIterator testDataIter = new SequenceRecordReaderDataSetIterator(testFeatures, testLabels, miniBatchSize, -1, true, SequenceRecordReaderDataSetIterator.AlignmentMode.ALIGN_END);
-
-        trainDataIter.setPreProcessor(normalizer);
-        testDataIter.setPreProcessor(normalizer);
-
-        // ----- Configure the network -----
-        MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
-                .seed(140)
-                .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
-                .iterations(1)
-                .weightInit(WeightInit.XAVIER)
-                .updater(Updater.NESTEROVS).momentum(0.9)
-                .learningRate(0.15)
-                .list()
-                .layer(0, new GravesLSTM.Builder().activation(Activation.TANH).nIn(numOfVariables).nOut(10)
-                        .build())
-                .layer(1, new RnnOutputLayer.Builder(LossFunctions.LossFunction.MSE)
-                        .activation(Activation.IDENTITY).nIn(10).nOut(numOfVariables).build())
-                .build();
-
-        MultiLayerNetwork net = new MultiLayerNetwork(conf);
-        net.init();
-
-        net.setListeners(new ScoreIterationListener(20));
-
-        // ----- Train the network, evaluating the test set performance at each epoch -----
-        int nEpochs = 50;
-
-        for (int i = 0; i < nEpochs; i++) {
-            net.fit(trainDataIter);
+            //Normalize the training data
+            NormalizerMinMaxScaler normalizer = new NormalizerMinMaxScaler(0, 1);
+            normalizer.fitLabel(true);
+            normalizer.fit(trainDataIter);              //Collect training data statistics
             trainDataIter.reset();
-            LOGGER.info("Epoch " + i + " complete. Time series evaluation:");
 
-            RegressionEvaluation evaluation = new RegressionEvaluation(numOfVariables);
+            LOGGER.info("*****SAVE FITTED NORMALIZER*****");
 
-            //Run evaluation. This is on 25k reviews, so can take some time
-            while (testDataIter.hasNext()) {
-                DataSet t = testDataIter.next();
-                INDArray features = t.getFeatureMatrix();
-                INDArray labels = t.getLabels();
-                INDArray predicted = net.output(features, true);
+            // Where to save normalizer
+            File locationToSaveNormalizer = new File("fitted_normalizer.zip");
 
-                evaluation.evalTimeSeries(labels, predicted);
+            // Now we want to save the normalizer to a binary file. For doing this, one can use the NormalizerSerializer.
+            NormalizerSerializer serializer = NormalizerSerializer.getDefault();
+
+            // Save the normalizer to the location to save
+            serializer.write(normalizer, locationToSaveNormalizer);
+
+            // ----- Load the test data -----
+            //Same process as for the training data.
+            SequenceRecordReader testFeatures = new CSVSequenceRecordReader();
+            testFeatures.initialize(new NumberedFileInputSplit(featuresDirTest.getAbsolutePath() + "/test_%d.csv", trainSize, trainSize + testSize - 1));
+            SequenceRecordReader testLabels = new CSVSequenceRecordReader();
+            testLabels.initialize(new NumberedFileInputSplit(labelsDirTest.getAbsolutePath() + "/test_%d.csv", trainSize, trainSize + testSize - 1));
+
+            DataSetIterator testDataIter = new SequenceRecordReaderDataSetIterator(testFeatures, testLabels, miniBatchSize, -1, true, SequenceRecordReaderDataSetIterator.AlignmentMode.ALIGN_END);
+
+            trainDataIter.setPreProcessor(normalizer);
+            testDataIter.setPreProcessor(normalizer);
+
+            // ----- Configure the network -----
+            MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
+                    .seed(140)
+                    .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
+                    .iterations(1)
+                    .weightInit(WeightInit.XAVIER)
+                    .updater(Updater.NESTEROVS).momentum(0.9)
+                    .learningRate(0.15)
+                    .list()
+                    .layer(0, new GravesLSTM.Builder().activation(Activation.TANH).nIn(numOfVariables).nOut(10)
+                            .build())
+                    .layer(1, new RnnOutputLayer.Builder(LossFunctions.LossFunction.MSE)
+                            .activation(Activation.IDENTITY).nIn(10).nOut(numOfVariables).build())
+                    .build();
+
+            MultiLayerNetwork net = new MultiLayerNetwork(conf);
+            net.init();
+
+            net.setListeners(new ScoreIterationListener(20));
+
+            // ----- Train the network, evaluating the test set performance at each epoch -----
+            int nEpochs = 50;
+
+            for (int i = 0; i < nEpochs; i++) {
+                net.fit(trainDataIter);
+                trainDataIter.reset();
+                LOGGER.info("Epoch " + i + " complete. Time series evaluation:");
+
+                RegressionEvaluation evaluation = new RegressionEvaluation(numOfVariables);
+
+                //Run evaluation. This is on 25k reviews, so can take some time
+                while (testDataIter.hasNext()) {
+                    DataSet t = testDataIter.next();
+                    INDArray features = t.getFeatureMatrix();
+                    INDArray labels = t.getLabels();
+                    INDArray predicted = net.output(features, true);
+
+                    evaluation.evalTimeSeries(labels, predicted);
+                }
+
+                System.out.println(evaluation.stats());
+                testDataIter.reset();
             }
 
-            System.out.println(evaluation.stats());
-            testDataIter.reset();
-        }
+            LOGGER.info("*****SAVE TRAINED MODEL*****");
+            // Details
 
-        LOGGER.info("*****SAVE TRAINED MODEL*****");
-        // Details
+            // Where to save model
+            File locationToSave = new File("trained_rnn_model.zip");
 
-        // Where to save model
-        File locationToSave = new File("trained_rnn_model.zip");
+            // boolean save Updater
+            boolean saveUpdater = false;
 
-        // boolean save Updater
-        boolean saveUpdater = false;
+            ModelSerializer.writeModel(net, locationToSave, saveUpdater);
 
-        ModelSerializer.writeModel(net, locationToSave, saveUpdater);
-
-        /*
+            /*
          * All code below this point is only necessary for plotting
-         */
-        //Initialize rnnTimeStep with train data
-        while (trainDataIter.hasNext()) {
-            DataSet t = trainDataIter.next();
-            net.rnnTimeStep(t.getFeatureMatrix());
-        }
+             */
+            //Initialize rnnTimeStep with train data
+            while (trainDataIter.hasNext()) {
+                DataSet t = trainDataIter.next();
+                net.rnnTimeStep(t.getFeatureMatrix());
+            }
 
 // Get the rnnTimeStep state after Initialized rnnTimeStep with train data and
 // export to file / DB
-        Map<String, INDArray> state = net.rnnGetPreviousState(0);
-        exportStateFile(state);
+            Map<String, INDArray> state = net.rnnGetPreviousState(0);
+            exportStateFile(state);
 
-        trainDataIter.reset();
+            trainDataIter.reset();
 
-        // Predict test data using the rnnTimeStep method
-        DataSet t = testDataIter.next();
-        INDArray predicted = net.rnnTimeStep(t.getFeatureMatrix());
-        normalizer.revertLabels(predicted);
-        // Identical predictions as from 'INDArray predicted = net.output(features, true)'
+            // Predict test data using the rnnTimeStep method
+            DataSet t = testDataIter.next();
+            INDArray predicted = net.rnnTimeStep(t.getFeatureMatrix());
+            normalizer.revertLabels(predicted);
+            // Identical predictions as from 'INDArray predicted = net.output(features, true)'
 //        System.out.println("predicted: " + predicted.toString());
 
 // Collect predictions to list for DB writing
-        INDArray arrayOfPredictions = predicted.getRow(0);
-        for (int i = 0; i < arrayOfPredictions.length(); i++) {
-            predictions.add(arrayOfPredictions.getDouble(i));
-        }
+            INDArray arrayOfPredictions = predicted.getRow(0);
+            for (int i = 0; i < arrayOfPredictions.length(); i++) {
+                predictions.add(arrayOfPredictions.getDouble(i));
+            }
 
-        // Write predictions to DB
-        writePredictionsToDB(predictions);
+            // Write predictions to DB
+            writePredictionsToDB(predictions);
 
-        /*
+            /*
         //Convert raw string data to IndArrays for plotting
         INDArray trainArray = createIndArrayFromStringList(rawStrings, 0, trainSize);
         INDArray testArray = createIndArrayFromStringList(rawStrings, trainSize, testSize);
@@ -315,14 +318,15 @@ public class Train implements Serializable {
         createSeries(c, predicted, trainSize + 1 + SLIDE, "Predicted test data");
 
         plotDataset(c); */
-        // Fast-forward the Training Progress Bar to 100% when training method is ready
+            // Fast-forward the Training Progress Bar to 100% when training method is ready
         
-        // WIP
-        qualifyForecastPeriods();
+            // WIP
+            qualifyForecastPeriods();
 
-        progressBarView.setProgress(100);
+            progressBarView.setProgress(100);
 
-        LOGGER.info("----- Training Complete -----");
+            LOGGER.info("----- Training Complete -----");
+        }
     }
 
     /**
