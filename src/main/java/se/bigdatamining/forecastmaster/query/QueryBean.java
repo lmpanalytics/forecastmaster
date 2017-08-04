@@ -217,7 +217,7 @@ public class QueryBean implements Serializable {
         INDArray bottomRow = parentFeatureArray.getRow(miniBatchSize - 1).dup();
 
         // Loop through the remaining time slices after last feature in QueryRNN.java (memory)
-        int loopStartIdx = 28 + 1; // Previous state + 1 idx
+        int loopStartIdx = trainer.calcPreviousStateIdx() + 1 - previousStateTrainSize; // Previous state + 1 idx
         int delta = rawStrings.size() - loopStartIdx; // Entries until end of list
         for (int i = loopStartIdx; i < loopStartIdx + delta; i++) {
 
