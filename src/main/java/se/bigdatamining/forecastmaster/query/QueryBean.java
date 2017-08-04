@@ -505,7 +505,7 @@ public class QueryBean implements Serializable {
             LOGGER.info("SUCCESS: Qualified additional future predictions read from file");
 
         } catch (FileNotFoundException e) {
-            LOGGER.error("File not found. {}", e);
+            LOGGER.error("File 'qualifiedAdditionalFuturePredictions.txt' not found.");
         } catch (IOException e) {
             LOGGER.error("Error initializing stream. {}", e);
         } catch (ClassNotFoundException e) {

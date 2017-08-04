@@ -64,6 +64,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.PostConstruct;
+import javax.enterprise.context.RequestScoped;
 import javax.enterprise.context.SessionScoped;
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -92,7 +93,7 @@ import se.bigdatamining.forecastmaster.Neo4jBean;
  * @author Magnus Palm
  */
 @Named(value = "train")
-@SessionScoped
+@RequestScoped
 public class Train implements Serializable {
 
     @Inject

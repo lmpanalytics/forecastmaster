@@ -176,24 +176,26 @@ public class DataViewBean implements Serializable {
      * Populates fcDataMap with data from database
      */
     private void populateFcDataMap() {
+        
+        // Handle NPE
+        if (!actDataMap.isEmpty()) {
+            // Calculate the average time period and use that as time periods for t+1, t+2, ..., t+n
+            LocalDate lastEntry = Collections.max(actDataMap.keySet());
+            LocalDate firstEntry = Collections.min(actDataMap.keySet());
+            long daysBetween = DAYS.between(firstEntry, lastEntry);
+            long increment = daysBetween / actDataMap.size(); // averagePeriod
 
-        // Calculate the average time period and use that as time periods for t+1, t+2, ..., t+n
-        LocalDate lastEntry = Collections.max(actDataMap.keySet());
-        LocalDate firstEntry = Collections.min(actDataMap.keySet());
-        long daysBetween = DAYS.between(firstEntry, lastEntry);
-        long increment = daysBetween / actDataMap.size(); // averagePeriod
-
-        // Call the future time predictions from the Query
-        long days = 0L;
-        double[] fcArray = query.getForecasts();
-        for (int i = 0; i < fcArray.length; i++) {
-            double prediction = fcArray[i];
-            // Put in the fcDataMap
-            days = days + increment;
-            LocalDate date = lastEntry.plusDays(days);
-            fcDataMap.put(date, new ChartData(date, prediction));
+            // Call the future time predictions from the Query
+            long days = 0L;
+            double[] fcArray = query.getForecasts();
+            for (int i = 0; i < fcArray.length; i++) {
+                double prediction = fcArray[i];
+                // Put in the fcDataMap
+                days = days + increment;
+                LocalDate date = lastEntry.plusDays(days);
+                fcDataMap.put(date, new ChartData(date, prediction));
+            }
         }
-
     }
 
     private void createLineModels() {
