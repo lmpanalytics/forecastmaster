@@ -98,7 +98,7 @@ limitations under the License.
                     <h:form>
                         <p:menu>
                             <p:submenu label="Resources">
-                                <p:menuitem value="Train" onclick="PF('pbAjax').start();" action="#{train.doTraining}" icon="ui-icon-star" update="@all">
+                                <p:menuitem value="Train" onclick="PF('pbAjax').start();" action="#{trainingBean.doTraining}" icon="ui-icon-star" update="@all">
                                     <f:actionListener binding="#{progressBarView.cancel()}" />
                                 </p:menuitem>
 

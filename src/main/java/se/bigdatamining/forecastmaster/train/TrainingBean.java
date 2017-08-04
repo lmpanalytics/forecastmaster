@@ -31,24 +31,13 @@ import org.deeplearning4j.nn.conf.layers.RnnOutputLayer;
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
 import org.deeplearning4j.nn.weights.WeightInit;
 import org.deeplearning4j.optimize.listeners.ScoreIterationListener;
-import org.jfree.chart.ChartFactory;
-import org.jfree.chart.ChartPanel;
-import org.jfree.chart.JFreeChart;
-import org.jfree.chart.axis.NumberAxis;
-import org.jfree.chart.plot.PlotOrientation;
-import org.jfree.chart.plot.XYPlot;
-import org.jfree.data.xy.XYSeries;
-import org.jfree.data.xy.XYSeriesCollection;
-import org.jfree.ui.RefineryUtilities;
 import org.nd4j.linalg.activations.Activation;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.dataset.DataSet;
 import org.nd4j.linalg.dataset.api.iterator.DataSetIterator;
 import org.nd4j.linalg.dataset.api.preprocessor.NormalizerMinMaxScaler;
-import org.nd4j.linalg.factory.Nd4j;
 import org.nd4j.linalg.lossfunctions.LossFunctions;
 
-import javax.swing.*;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -91,9 +80,9 @@ import se.bigdatamining.forecastmaster.Neo4jBean;
  *
  * @author Magnus Palm
  */
-@Named(value = "train")
+@Named(value = "trainingBean")
 @RequestScoped
-public class Train implements Serializable {
+public class TrainingBean implements Serializable {
 
     @Inject
     Neo4jBean neo4jBean;
@@ -105,7 +94,7 @@ public class Train implements Serializable {
     SolverBean solver;
 
     private static final long serialVersionUID = 1L;
-    private static final Logger LOGGER = LoggerFactory.getLogger(Train.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(TrainingBean.class);
     private static Session session;
 
     //Initiate fields for training, testing, and time steps. Set in @PostConstruct.
@@ -115,9 +104,9 @@ public class Train implements Serializable {
     private int miniBatchSize = 0;
 
     /**
-     * Creates a new instance of Train
+     * Creates a new instance of TrainingBean
      */
-    public Train() {
+    public TrainingBean() {
     }
 
     @PostConstruct
@@ -140,9 +129,6 @@ public class Train implements Serializable {
         numberOfTimesteps = solver.getNumberOfTimesteps();
         miniBatchSize = solver.getMiniBatchSize();
     }
-
-    // (for development purpose) Roll 'Predicted test data' series forward in plot
-    private static final int SLIDE = 0;
 
     private static File initBaseFile(String fileName) {
         try {
@@ -180,7 +166,7 @@ public class Train implements Serializable {
             LOGGER.info("Using AbsolutePath: " + baseDir.getAbsolutePath());
 
             //Prepare multi time step data, see method comments for more info        
-            List<String> rawStrings = prepareTrainAndTest(trainSize, testSize, numberOfTimesteps);
+            prepareTrainAndTest(trainSize, testSize, numberOfTimesteps);
 
             // ----- Load the training data -----
             SequenceRecordReader trainFeatures = new CSVSequenceRecordReader();
@@ -249,7 +235,7 @@ public class Train implements Serializable {
 
                 RegressionEvaluation evaluation = new RegressionEvaluation(numOfVariables);
 
-                //Run evaluation. This is on 25k reviews, so can take some time
+                //Run evaluation.
                 while (testDataIter.hasNext()) {
                     DataSet t = testDataIter.next();
                     INDArray features = t.getFeatureMatrix();
@@ -274,9 +260,6 @@ public class Train implements Serializable {
 
             ModelSerializer.writeModel(net, locationToSave, saveUpdater);
 
-            /*
-         * All code below this point is only necessary for plotting
-             */
             //Initialize rnnTimeStep with train data
             while (trainDataIter.hasNext()) {
                 DataSet t = trainDataIter.next();
@@ -294,8 +277,6 @@ public class Train implements Serializable {
             DataSet t = testDataIter.next();
             INDArray predicted = net.rnnTimeStep(t.getFeatureMatrix());
             normalizer.revertLabels(predicted);
-            // Identical predictions as from 'INDArray predicted = net.output(features, true)'
-//        System.out.println("predicted: " + predicted.toString());
 
 // Collect predictions to list for DB writing
             INDArray arrayOfPredictions = predicted.getRow(0);
@@ -306,102 +287,14 @@ public class Train implements Serializable {
             // Write predictions to DB
             writePredictionsToDB(predictions);
 
-            /*
-        //Convert raw string data to IndArrays for plotting
-        INDArray trainArray = createIndArrayFromStringList(rawStrings, 0, trainSize);
-        INDArray testArray = createIndArrayFromStringList(rawStrings, trainSize, testSize);
-
-        //Create plot with out data
-        XYSeriesCollection c = new XYSeriesCollection();
-        createSeries(c, trainArray, 0, "Train data");
-        createSeries(c, testArray, trainSize, "Actual test data");
-        createSeries(c, predicted, trainSize + 1 + SLIDE, "Predicted test data");
-
-        plotDataset(c); */
-            // Fast-forward the Training Progress Bar to 100% when training method is ready
-        
             // WIP
             qualifyForecastPeriods();
 
+// Fast-forward the Training Progress Bar to 100% when training method is ready
             progressBarView.setProgress(100);
 
             LOGGER.info("----- Training Complete -----");
         }
-    }
-
-    /**
-     * Creates an IndArray from a list of strings Used for plotting purposes
-     */
-    private static INDArray createIndArrayFromStringList(List<String> rawStrings, int startIndex, int length) {
-        List<String> stringList = rawStrings.subList(startIndex, startIndex + length);
-
-        double[][] primitives = new double[numOfVariables][stringList.size()];
-        for (int i = 0; i < stringList.size(); i++) {
-            String[] vals = stringList.get(i).split(",");
-            for (int j = 0; j < vals.length; j++) {
-                primitives[j][i] = Double.valueOf(vals[j]);
-            }
-        }
-
-        return Nd4j.create(new int[]{1, length}, primitives);
-    }
-
-    /**
-     * Used to create the different time series for plotting purposes
-     */
-    private static void createSeries(XYSeriesCollection seriesCollection, INDArray data, int offset, String name) {
-        int nRows = data.shape()[2];
-        boolean predicted = name.startsWith("Predicted");
-
-        XYSeries series = new XYSeries(name);
-        // temp hack to accomodate single column case
-        if (numOfVariables == 1) {
-            for (int i = 0; i < nRows; i++) {
-                series.add(i + offset, data.getDouble(i));
-            }
-        } else /* multiple column case */ {
-            for (int i = 0; i < nRows; i++) {
-                if (predicted) {
-                    series.add(i + offset, data.slice(SLIDE).slice(0).getDouble(i));
-                } else {
-                    series.add(i + offset, data.slice(0).getDouble(i));
-                }
-            }
-        }
-        seriesCollection.addSeries(series);
-    }
-
-    /**
-     * Generate an xy plot of the datasets provided.
-     */
-    private static void plotDataset(XYSeriesCollection c) {
-
-        String title = "Regression example";
-        String xAxisLabel = "Timestep";
-        String yAxisLabel = "Number of passengers";
-        PlotOrientation orientation = PlotOrientation.VERTICAL;
-        boolean legend = true;
-        boolean tooltips = false;
-        boolean urls = false;
-        JFreeChart chart = ChartFactory.createXYLineChart(title, xAxisLabel, yAxisLabel, c, orientation, legend, tooltips, urls);
-
-        // get a reference to the plot for further customisation...
-        final XYPlot plot = chart.getXYPlot();
-
-        // Auto zoom to fit time series in initial window
-        final NumberAxis rangeAxis = (NumberAxis) plot.getRangeAxis();
-        rangeAxis.setAutoRange(true);
-
-        JPanel panel = new ChartPanel(chart);
-
-        JFrame f = new JFrame();
-        f.add(panel);
-        f.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        f.pack();
-        f.setTitle("Training Data");
-
-        RefineryUtilities.centerFrameOnScreen(f);
-        f.setVisible(true);
     }
 
     /**
@@ -432,7 +325,7 @@ public class Train implements Serializable {
                 if (success) {
                     LOGGER.info("Deleted data file {} ", f.toPath().toAbsolutePath().toString());
                 } else {
-                    LOGGER.error("Delete data file {} ", f.toPath().toAbsolutePath().toString());
+                    LOGGER.error("Delete data file in method 'prepareTrainAndTest' {} ", f.toPath().toAbsolutePath().toString());
                 }
 
             }
@@ -444,6 +337,7 @@ public class Train implements Serializable {
         FileUtils.cleanDirectory(featuresDirTest);
         FileUtils.cleanDirectory(labelsDirTest);
 
+        // Query database for customer's raw data. Write data to a CSV file
         generateDataFile(rawPath);
 
         List<String> rawStrings = Files.readAllLines(rawPath, Charset.defaultCharset());
@@ -489,9 +383,9 @@ public class Train implements Serializable {
                 LOGGER.info("SUCCESS: RNN Previous state written to file 'rnnPreviousState.txt'");
             }
         } catch (FileNotFoundException e) {
-            LOGGER.error("File not found. {}", e);
+            LOGGER.error("File 'rnnPreviousState.txt' not found.");
         } catch (IOException e) {
-            LOGGER.error("Error initializing stream. {}", e);
+            LOGGER.error("Error initializing stream in method 'exportStateFile'.");
         }
     }
 
@@ -525,9 +419,9 @@ public class Train implements Serializable {
             }
             LOGGER.info("SUCCESS: Wrote CSV data file {}", rawPath);
         } catch (ClientException e) {
-            LOGGER.error("ClientException in 'generateCSV' {}", e);
+            LOGGER.error("ClientException in method 'generateDataFile'");
         } catch (IOException ex) {
-            LOGGER.error("IOException in 'generateCSV' {}", ex);
+            LOGGER.error("IOException in method 'generateDataFile'");
         }
     }
 
@@ -665,13 +559,14 @@ public class Train implements Serializable {
                 LOGGER.info("SUCCESS: (WIP) Training peformance qualified {} Additional Future Predictions.\nResult written to file 'qualifiedAdditionalFuturePredictions.txt'", addFcPeriods);
             }
         } catch (FileNotFoundException e) {
-            LOGGER.error("File not found. {}", e);
+            LOGGER.error("File 'qualifiedAdditionalFuturePredictions.txt' not found.");
         } catch (IOException e) {
-            LOGGER.error("Error initializing stream. {}", e);
+            LOGGER.error("Error initializing stream in method 'qualifyForecastPeriods()'.");
         }
 
     }
 
+    // Getters and Setters
     public int getTrainSize() {
         return trainSize;
     }

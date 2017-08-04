@@ -56,7 +56,7 @@ import org.neo4j.driver.v1.exceptions.ClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.bigdatamining.forecastmaster.Neo4jBean;
-import se.bigdatamining.forecastmaster.train.Train;
+import se.bigdatamining.forecastmaster.train.TrainingBean;
 
 /**
  * Queries a previously trained RNN for time series predictions
@@ -71,7 +71,7 @@ public class QueryBean implements Serializable {
     Neo4jBean neo4jBean;
 
     @Inject
-    Train trainer;
+    TrainingBean trainer;
 
     private static final long serialVersionUID = 1L;
     private static final Logger LOGGER = LoggerFactory.getLogger(QueryBean.class);
@@ -137,16 +137,12 @@ public class QueryBean implements Serializable {
         LOGGER.info("Using AbsolutePath: " + baseDir.getAbsolutePath());
 
         //Set number of examples for training, testing, and time steps
-//        int trainSize = 43 - 20; // (Time slices) Same as length of CSV file, i.e. rawStrings.size - numberOfTimesteps
         int trainSize = queryRawDataSizeDB() - numberOfTimesteps; // (Time slices) Same as length of CSV file, i.e. rawStrings.size - numberOfTimesteps
 //        int numberOfTimesteps = 20; // Must be same as for the trained RMM
 
         //Prepare multi time step data, see method comments for more info
         List<String> rawStrings = getQueryData(trainSize, numberOfTimesteps);
 
-        //Make sure miniBatchSize is divisable by trainSize and testSize,
-        //as rnnTimeStep will not accept different sized examples
-//        int miniBatchSize = 10;
         // ----- Load the training data -----
         SequenceRecordReader trainFeatures = new CSVSequenceRecordReader();
         trainFeatures.initialize(new NumberedFileInputSplit(featuresDirTrain.getAbsolutePath() + "/train_%d.csv", 0, trainSize - 1));
@@ -181,12 +177,7 @@ public class QueryBean implements Serializable {
         // Get the predictions
         DataSet t = trainDataIter.next();
         INDArray parentFeatureArray = t.getFeatureMatrix(); // up to and including idx 128
-        INDArray predicted = net.rnnTimeStep(parentFeatureArray);
-//        System.out.println("parentFeatureArray: " + parentFeatureArray.toString());
-//        System.out.println("");
-        /* normalizer.revertLabels(predicted);
-        System.out.println("predicted: " + predicted.toString());
-        System.out.println(""); */
+        net.rnnTimeStep(parentFeatureArray);
 
         // ****** Prepare to predict using data after the initial data processing is done *****
         // Convert the list of rawstrings to an array of doubles
@@ -240,7 +231,6 @@ public class QueryBean implements Serializable {
 
             // recast the flattened array to a new feature array
             INDArray newFeatureArray = flattened.reshape('c', shape);
-//            System.out.println("newFeatureArray: " + newFeatureArray.toString());
 
             // feed to 'net.rnnTimeStep()' and get updated predictions for next time slice
             newPredicted = net.rnnTimeStep(newFeatureArray);
@@ -255,7 +245,6 @@ public class QueryBean implements Serializable {
             // View prediction t+1 in the last feature loop
             if (i == loopStartIdx + delta - 1 && additionalFuturePredictions == 0) {
                 normalizer.revertLabels(newPredicted);
-//                System.out.println("newPredicted: " + newPredicted.toString());
 
                 // put prediction t+1 in forecast output array
                 bottomRow = newPredicted.getRow(miniBatchSize - 1).dup();
@@ -288,7 +277,6 @@ public class QueryBean implements Serializable {
 
             // recast the flattened array to a new feature array
             INDArray newFeatureArray = flattened.reshape('c', shape);
-//            System.out.println("newFeatureArray: " + newFeatureArray.toString());
 
             // feed to 'net.rnnTimeStep()' and get updated predictions for next time slice
             newPredicted = net.rnnTimeStep(newFeatureArray);
@@ -303,7 +291,6 @@ public class QueryBean implements Serializable {
             // View prediction t+n in the last feature loop
             if (i == additionalFuturePredictions - 1) {
                 normalizer.revertLabels(newPredicted);
-//                System.out.println("newPredicted: " + newPredicted.toString());
 
                 // put predictions in forecast output array
                 newPredictedBottomRow = newPredicted.getRow(miniBatchSize - 1).dup();
@@ -346,11 +333,11 @@ public class QueryBean implements Serializable {
             LOGGER.info("SUCCESS: RNN Previous state read from file");
 
         } catch (FileNotFoundException e) {
-            LOGGER.error("File not found. {}", e);
+            LOGGER.error("File 'rnnPreviousState.txt' not found.");
         } catch (IOException e) {
-            LOGGER.error("Error initializing stream. {}", e);
+            LOGGER.error("Error initializing stream in method 'getStateFile'.");
         } catch (ClassNotFoundException e) {
-            LOGGER.error("Class not found. {}", e);
+            LOGGER.error("Class not found in method 'getStateFile'.");
         }
         return rnnPreviousState;
     }
@@ -380,7 +367,7 @@ public class QueryBean implements Serializable {
                 if (success) {
                     LOGGER.info("Deleted data file {} ", f.toPath().toAbsolutePath().toString());
                 } else {
-                    LOGGER.error("Delete data file {} ", f.toPath().toAbsolutePath().toString());
+                    LOGGER.error("Delete data file in method 'getQueryData' {} ", f.toPath().toAbsolutePath().toString());
                 }
 
             }
@@ -388,7 +375,7 @@ public class QueryBean implements Serializable {
 
         //Remove all files before generating new ones
         FileUtils.cleanDirectory(featuresDirTrain);
-        FileUtils.cleanDirectory(labelsDirTrain); // FIX LOGIC
+        FileUtils.cleanDirectory(labelsDirTrain); // FIX LOGIC?
         FileUtils.cleanDirectory(featuresDirTest);
         FileUtils.cleanDirectory(labelsDirTest);
 
@@ -403,8 +390,6 @@ public class QueryBean implements Serializable {
             for (int j = 0; j < numberOfTimesteps; j++) {
                 Files.write(featuresPath, rawStrings.get(i + j).concat(System.lineSeparator()).getBytes(), StandardOpenOption.APPEND, StandardOpenOption.CREATE);
 
-//                String var = rawStrings.get(i + j);
-//                System.out.printf("Time sliceIdx %s, SampleIdx %s : %s%n", i, j, var);
             }
             // FIX NEEDED. CREATE DUMMY LABELS INSTEAD?
             Files.write(labelsPath, rawStrings.get(i + numberOfTimesteps).concat(System.lineSeparator()).getBytes(), StandardOpenOption.APPEND, StandardOpenOption.CREATE);
@@ -444,9 +429,9 @@ public class QueryBean implements Serializable {
             }
             LOGGER.info("SUCCESS: Wrote CSV data file {}", rawPath);
         } catch (ClientException e) {
-            LOGGER.error("ClientException in 'generateCSV' {}", e);
+            LOGGER.error("ClientException in method 'generateDataFile'.");
         } catch (IOException ex) {
-            LOGGER.error("IOException in 'generateCSV' {}", ex);
+            LOGGER.error("IOException in method 'generateDataFile'");
         }
     }
 
@@ -507,9 +492,9 @@ public class QueryBean implements Serializable {
         } catch (FileNotFoundException e) {
             LOGGER.error("File 'qualifiedAdditionalFuturePredictions.txt' not found.");
         } catch (IOException e) {
-            LOGGER.error("Error initializing stream. {}", e);
+            LOGGER.error("Error initializing stream in method 'getQualifiedAdditionalFuturePredictions'.");
         } catch (ClassNotFoundException e) {
-            LOGGER.error("Class not found. {}", e);
+            LOGGER.error("Class not found in method 'getQualifiedAdditionalFuturePredictions'.");
         }
         return addFcPeriods;
     }
