@@ -21,7 +21,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import javax.inject.Named;
-import javax.enterprise.context.SessionScoped;
 import java.io.Serializable;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -32,6 +31,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.PostConstruct;
+import javax.enterprise.context.RequestScoped;
 import javax.inject.Inject;
 import org.apache.commons.io.FileUtils;
 import org.datavec.api.records.reader.SequenceRecordReader;
@@ -64,7 +64,7 @@ import se.bigdatamining.forecastmaster.train.Train;
  * @author Magnus Palm
  */
 @Named(value = "queryBean")
-@SessionScoped
+@RequestScoped // Import latest data from @PostConstruct on call 'doQuery' from jsf or on refresh
 public class QueryBean implements Serializable {
 
     @Inject
@@ -83,6 +83,7 @@ public class QueryBean implements Serializable {
 //    private static int testSize = 0;
     private int numberOfTimesteps = 0;
     private static int miniBatchSize = 0;
+    private double[] forecasts;
     private int additionalFuturePredictions;
 
     /**
@@ -104,7 +105,8 @@ public class QueryBean implements Serializable {
         numberOfTimesteps = trainer.getNumberOfTimesteps();
         miniBatchSize = trainer.getMiniBatchSize();
 
-        additionalFuturePredictions = 0; // These are predictions t+2, t+3, ..., t+n
+        additionalFuturePredictions = getQualifiedAdditionalFuturePredictions(); // These are predictions t+2, t+3, ..., t+n
+        forecasts = new double[1 + additionalFuturePredictions];
     }
 
     private static File initBaseFile(String fileName) {
@@ -124,7 +126,6 @@ public class QueryBean implements Serializable {
     private static File labelsDirTest = new File(baseTestDir, "labels");
 
     private static int numOfVariables = 0;  // in csv.
-    private double[] forecasts = new double[1 + additionalFuturePredictions];
 
     /**
      * Queries the trained RNN for future time predictions.
@@ -486,26 +487,31 @@ public class QueryBean implements Serializable {
     }
 
     /**
+     * Method to import the qualifiedAdditionalFuturePredictions from file on
+     * disk.
+     *
      * These are predictions t+2, t+3, ..., t+n
      *
      * (Prediction t+1 is always given)
-     *
-     * @return number of additional Future Predictions
      */
-    public int getAdditionalFuturePredictions() {
-        return additionalFuturePredictions;
-    }
+    private static int getQualifiedAdditionalFuturePredictions() {
+        int addFcPeriods = 0;
+        try {
+            try (FileInputStream fi = new FileInputStream(new File("qualifiedAdditionalFuturePredictions.txt"));
+                    ObjectInputStream oi = new ObjectInputStream(fi)) {
+                // Read objects from file
+                addFcPeriods = (int) oi.readObject();
+            }
+            LOGGER.info("SUCCESS: Qualified additional future predictions read from file");
 
-    /**
-     * These are predictions t+2, t+3, ..., t+n
-     *
-     * (Prediction t+1 is always given)
-     *
-     * @param additionalFuturePredictions number of additional Future
-     * Predictions to set
-     */
-    public void setAdditionalFuturePredictions(int additionalFuturePredictions) {
-        this.additionalFuturePredictions = additionalFuturePredictions;
+        } catch (FileNotFoundException e) {
+            LOGGER.error("File not found. {}", e);
+        } catch (IOException e) {
+            LOGGER.error("Error initializing stream. {}", e);
+        } catch (ClassNotFoundException e) {
+            LOGGER.error("Class not found. {}", e);
+        }
+        return addFcPeriods;
     }
 
     /**

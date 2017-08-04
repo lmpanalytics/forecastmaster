@@ -316,7 +316,12 @@ public class Train implements Serializable {
 
         plotDataset(c); */
         // Fast-forward the Training Progress Bar to 100% when training method is ready
+        
+        // WIP
+        qualifyForecastPeriods();
+
         progressBarView.setProgress(100);
+
         LOGGER.info("----- Training Complete -----");
     }
 
@@ -616,6 +621,51 @@ public class Train implements Serializable {
     public int calcPreviousStateIdx() {
 
         return trainSize + testSize + miniBatchSize - 1 - 1;
+    }
+
+    /**
+     * DEVELOPMENT WORK IN PROGRESS
+     *
+     * Qualifies the number of future additional predictions. These are
+     * predictions t+2, t+3, ..., t+n
+     *
+     * (Prediction t+1 is always given)
+     */
+    private void qualifyForecastPeriods() {
+
+        // Temporary dummy input, to be pulled from evaluation stats in doTraining method.
+        double trainingperformance = 0.1;
+
+        int addFcPeriods = 0;
+
+        // Qualification ladder
+        if (trainSize < 100 || trainingperformance <= 0.2) {
+            addFcPeriods = 0;
+        } else if (trainingperformance > 0.2 && trainingperformance <= 0.3) {
+            addFcPeriods = 1;
+        } else if (trainingperformance > 0.3 && trainingperformance <= 0.5) {
+            addFcPeriods = 2;
+            // Continue to build ladder... until UpperLimit UL
+        } else {
+            // UL (Could be different for type of period, Hrs, Days, Months etc)
+            addFcPeriods = 12;
+        }
+
+        // Export result to file to avoid triggering training sequence if call Getter beween html sessions
+        try {
+            FileOutputStream f = new FileOutputStream(new File("qualifiedAdditionalFuturePredictions.txt"));
+            // Write objects to file
+            try (ObjectOutputStream o = new ObjectOutputStream(f)) {
+                // Write objects to file
+                o.writeObject(addFcPeriods);
+                LOGGER.info("SUCCESS: (WIP) Training peformance qualified {} Additional Future Predictions.\nResult written to file 'qualifiedAdditionalFuturePredictions.txt'", addFcPeriods);
+            }
+        } catch (FileNotFoundException e) {
+            LOGGER.error("File not found. {}", e);
+        } catch (IOException e) {
+            LOGGER.error("Error initializing stream. {}", e);
+        }
+
     }
 
     public int getTrainSize() {
