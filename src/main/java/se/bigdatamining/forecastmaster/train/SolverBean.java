@@ -48,6 +48,7 @@ public class SolverBean {
 
     private Long trainSize = 0L;
     private Long testSize = 0L;
+    private long validationSize = 0L;
     private Long numberOfTimesteps = 0L /* Looking back, cannot be larger than the training size */;
 
     // Fields initiated by @PostConstruct
@@ -104,7 +105,7 @@ public class SolverBean {
         boolean isTestSizeDivisable = solveTestSize();
 
         // ***** 3. Check so all sum up *****
-        Long validationSize = rawDataSize - trainSize - testSize;
+        validationSize = rawDataSize - trainSize - testSize;
         Long sumTotal = trainSize + testSize + validationSize;
 
         boolean isDiffZero = false;
@@ -135,16 +136,16 @@ public class SolverBean {
     private boolean checkTimeStepFit() {
 
         boolean isNumberOfTimestepsFit = false;
-        if (numberOfTimesteps <= trainSize) {
+        if (numberOfTimesteps < validationSize) {
             isNumberOfTimestepsFit = true;
         } else {
-            System.out.printf("numberOfTimesteps:\t%s%n", numberOfTimesteps);
+            System.out.printf("Number of Timesteps:\t%s%nValidation Size:\t%s%n", numberOfTimesteps, validationSize);
             while (!isNumberOfTimestepsFit && numberOfTimesteps > 0) {
                 numberOfTimesteps--;
 
-                if (numberOfTimesteps <= trainSize) {
+                if (numberOfTimesteps < validationSize) {
                     isNumberOfTimestepsFit = true;
-                    System.out.println("Adjusted numberOfTimesteps: " + numberOfTimesteps);
+                    System.out.printf("Adjusted numberOfTimesteps:\t%s%nAdjusted Validation Size:\t%s%n", numberOfTimesteps, validationSize);
                 }
             }
             if (!isNumberOfTimestepsFit) {

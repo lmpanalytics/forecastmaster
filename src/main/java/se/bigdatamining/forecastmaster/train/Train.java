@@ -111,7 +111,7 @@ public class Train implements Serializable {
     //Initiate fields for training, testing, and time steps. Set in @PostConstruct.
     private int trainSize = 0;
     private int testSize = 0;
-    private int numberOfTimesteps = 20; // <<<====== FIX THIS !! (Code as user input from jsf train.xhtml)
+    private int numberOfTimesteps = 31;
     private int miniBatchSize = 0;
 
     /**
