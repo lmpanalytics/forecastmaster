@@ -28,4 +28,53 @@
     <welcome-file-list>
         <welcome-file>index.xhtml</welcome-file>
     </welcome-file-list>
+    <security-constraint>
+        <display-name>Constraint1</display-name>
+        <web-resource-collection>
+            <web-resource-name>wrcoll</web-resource-name>
+            <description>All pages require login access</description>
+            <url-pattern>/*</url-pattern>
+        </web-resource-collection>
+        <auth-constraint>
+            <description>Two product levels, and 4 roles at customer</description>
+            <role-name>BASIC</role-name>
+            <role-name>PRO</role-name>
+            <role-name>DIRECTOR </role-name>
+            <role-name>MDM</role-name>
+            <role-name>FORECASTER</role-name>
+            <role-name>TRAINER</role-name>
+        </auth-constraint>
+    </security-constraint>
+    <login-config>
+        <auth-method>FORM</auth-method>
+        <realm-name>file</realm-name>
+        <form-login-config>
+            <form-login-page>/login.html</form-login-page>
+            <form-error-page>/error.html</form-error-page>
+        </form-login-config>
+    </login-config>
+    <security-role>
+        <description>Licence for Application version BASIC</description>
+        <role-name>BASIC</role-name>
+    </security-role>
+    <security-role>
+        <description>Licence for Application version PRO</description>
+        <role-name>PRO</role-name>
+    </security-role>
+    <security-role>
+        <description>Full access</description>
+        <role-name>DIRECTOR </role-name>
+    </security-role>
+    <security-role>
+        <description>Can upload new data</description>
+        <role-name>MDM</role-name>
+    </security-role>
+    <security-role>
+        <description>Can do forecasting</description>
+        <role-name>FORECASTER</role-name>
+    </security-role>
+    <security-role>
+        <description>Can do training</description>
+        <role-name>TRAINER</role-name>
+    </security-role>
 </web-app>
