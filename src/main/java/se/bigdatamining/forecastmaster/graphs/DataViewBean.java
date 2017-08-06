@@ -15,7 +15,6 @@
  */
 package se.bigdatamining.forecastmaster.graphs;
 
-import java.io.Serializable;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -41,6 +40,7 @@ import org.primefaces.model.chart.DateAxis;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.bigdatamining.forecastmaster.Neo4jBean;
+import se.bigdatamining.forecastmaster.User;
 import se.bigdatamining.forecastmaster.query.QueryBean;
 
 /**
@@ -51,7 +51,10 @@ import se.bigdatamining.forecastmaster.query.QueryBean;
  */
 @Named(value = "dataViewBean")
 @RequestScoped // Will refresh on F5
-public class DataViewBean implements Serializable {
+public class DataViewBean {
+
+    @Inject
+    User user;
 
     @Inject
     Neo4jBean neo4jBean;
@@ -59,7 +62,6 @@ public class DataViewBean implements Serializable {
     @Inject
     QueryBean query;
 
-    private static final long serialVersionUID = 1L;
     private static final Logger LOGGER = LoggerFactory.getLogger(DataViewBean.class);
     private Session session;
 
@@ -123,7 +125,7 @@ public class DataViewBean implements Serializable {
             String tx = "MATCH (p:Pattern)-[:OWNED_BY]->(c:Customer {customerNumber:$custNo}) RETURN p.msEpoch AS ms, p.respVar0 AS respVar0 ORDER BY ms";
 
             StatementResult result = this.session.run(tx, Values.parameters(
-                    "custNo", "0000000001"
+                    "custNo", user.getCustomerNumber()
             ));
 
             while (result.hasNext()) {
@@ -137,7 +139,7 @@ public class DataViewBean implements Serializable {
                 // Add results to Map
                 actDataMap.put(date, new ChartData(date, respVar0));
             }
-            LOGGER.info("SUCCESS: Added chart data to ActDataMap");
+            LOGGER.info("SUCCESS: Added chart data to actDataMap");
         } catch (ClientException e) {
             LOGGER.error("Exception in 'populateActDataMap' {}", e);
         }
@@ -152,7 +154,7 @@ public class DataViewBean implements Serializable {
             String tx = "MATCH (pr:Prediction)-[:PREDICTED_FOR]->(p:Pattern)-[:OWNED_BY]->(c:Customer {customerNumber:$custNo}) RETURN p.msEpoch AS ms, pr.predicted AS pred ORDER BY ms";
 
             StatementResult result = this.session.run(tx, Values.parameters(
-                    "custNo", "0000000001"
+                    "custNo", user.getCustomerNumber()
             ));
 
             while (result.hasNext()) {
@@ -176,7 +178,7 @@ public class DataViewBean implements Serializable {
      * Populates fcDataMap with data from database
      */
     private void populateFcDataMap() {
-        
+
         // Handle NPE
         if (!actDataMap.isEmpty()) {
             // Calculate the average time period and use that as time periods for t+1, t+2, ..., t+n

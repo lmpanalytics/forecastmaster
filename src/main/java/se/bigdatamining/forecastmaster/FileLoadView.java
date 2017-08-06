@@ -23,10 +23,12 @@ package se.bigdatamining.forecastmaster;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import javax.annotation.security.DeclareRoles;
+import javax.annotation.security.RolesAllowed;
+import javax.ejb.Stateful;
 import javax.enterprise.context.SessionScoped;
 import javax.faces.application.FacesMessage;
 import javax.faces.context.FacesContext;
@@ -45,12 +47,17 @@ import org.slf4j.LoggerFactory;
 
 @Named(value = "fileLoadView")
 @SessionScoped
-public class FileLoadView implements Serializable {
+@Stateful
+@DeclareRoles({"BASIC", "PRO", "DIRECTOR", "MDM", "FORECASTER", "TRAINER"})
+public class FileLoadView {
 
     @Inject
     Neo4jBean neo;
+
+    @Inject
+    User user;
+
     private static final Logger LOGGER = LoggerFactory.getLogger(FileLoadView.class);
-    private static final long serialVersionUID = 1L;
     private static FileInputStream excelFile;
 
     /**
@@ -58,6 +65,7 @@ public class FileLoadView implements Serializable {
      *
      * @param event
      */
+    @RolesAllowed({"BASIC", "PRO", "DIRECTOR", "MDM"})
     public void handleFileUpload(FileUploadEvent event) {
 
         try {
@@ -73,9 +81,9 @@ public class FileLoadView implements Serializable {
 //        Write data patterns to the data base
             addPattern(patternMap);
 
-            LOGGER.info("Data written to Neo4j DB.");
+            LOGGER.info("Data written to DB.");
         } catch (IOException ex) {
-            LOGGER.error("Exception handleFileUpload method {}", ex);
+            LOGGER.error("Exception in handleFileUpload method {}", ex);
         }
     }
 
@@ -88,7 +96,7 @@ public class FileLoadView implements Serializable {
 
         try {
 
-            Workbook workbook = new XSSFWorkbook(this.excelFile);
+            Workbook workbook = new XSSFWorkbook(excelFile);
             Sheet datatypeSheet = workbook.getSheetAt(0);
             Iterator<Row> rowIterator = datatypeSheet.iterator();
 
@@ -127,9 +135,7 @@ public class FileLoadView implements Serializable {
             }
 
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
         } catch (IOException e) {
-            e.printStackTrace();
         }
         return m;
     }
@@ -148,11 +154,12 @@ public class FileLoadView implements Serializable {
                 pattern.values().stream().forEach((v) -> {
                     Double respVar0 = v.getResponeVar0();
                     Long ms = v.getMsTime();
-                    tx.run("MATCH (c:Customer { customerNumber: '0000000001' })"
+                    tx.run("MATCH (c:Customer { customerNumber: {custNo} })"
                             + "MERGE (p:Pattern {msEpoch: {t}, respVar0: {rv0}}) "
                             + "MERGE (p)-[:OWNED_BY]->(c)",
                             parameters("t", ms,
-                                    "rv0", respVar0));
+                                    "rv0", respVar0,
+                                    "custNo", user.getCustomerNumber()));
                     tx.success();  // Mark this write as successful.
                 });
             }

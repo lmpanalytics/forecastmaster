@@ -43,7 +43,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
-import java.io.Serializable;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -53,6 +52,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.PostConstruct;
+import javax.annotation.security.DeclareRoles;
+import javax.annotation.security.RolesAllowed;
+import javax.ejb.Stateful;
 import javax.enterprise.context.RequestScoped;
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -68,6 +70,7 @@ import org.neo4j.driver.v1.exceptions.ClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.bigdatamining.forecastmaster.Neo4jBean;
+import se.bigdatamining.forecastmaster.User;
 
 /**
  * The class runs a regression on multiple time steps. The data is transposed
@@ -81,8 +84,10 @@ import se.bigdatamining.forecastmaster.Neo4jBean;
  * @author Magnus Palm
  */
 @Named(value = "trainingBean")
+@Stateful
 @RequestScoped
-public class TrainingBean implements Serializable {
+@DeclareRoles({"BASIC", "PRO", "DIRECTOR", "MDM", "FORECASTER", "TRAINER"})
+public class TrainingBean {
 
     @Inject
     Neo4jBean neo4jBean;
@@ -93,7 +98,9 @@ public class TrainingBean implements Serializable {
     @Inject
     SolverBean solver;
 
-    private static final long serialVersionUID = 1L;
+    @Inject
+    User user;
+
     private static final Logger LOGGER = LoggerFactory.getLogger(TrainingBean.class);
     private static Session session;
 
@@ -102,6 +109,7 @@ public class TrainingBean implements Serializable {
     private int testSize = 0;
     private int numberOfTimesteps = 31;
     private int miniBatchSize = 0;
+    private String custNo;
 
     /**
      * Creates a new instance of TrainingBean
@@ -114,7 +122,10 @@ public class TrainingBean implements Serializable {
         // INITIATE CLASS SPECIFIC MAPS AND FIELDS HERE - THE ORDER IS IMPORTANT
 
         // Initialize driver
-        this.session = neo4jBean.getDRIVER().session();
+        session = neo4jBean.getDRIVER().session();
+
+        // Get customer number
+        custNo = user.getCustomerNumber();
 
         // Set solver fields
         solver.setRawDataSize(queryRawDataSizeDB());
@@ -156,6 +167,7 @@ public class TrainingBean implements Serializable {
      *
      * @throws Exception
      */
+    @RolesAllowed({"BASIC", "PRO", "DIRECTOR", "TRAINER"})
     public void doTraining() throws Exception {
 
         // Only run if data is present in the DB (new user exception handling)
@@ -166,7 +178,7 @@ public class TrainingBean implements Serializable {
             LOGGER.info("Using AbsolutePath: " + baseDir.getAbsolutePath());
 
             //Prepare multi time step data, see method comments for more info        
-            prepareTrainAndTest(trainSize, testSize, numberOfTimesteps);
+            prepareTrainAndTest(trainSize, testSize, numberOfTimesteps, custNo);
 
             // ----- Load the training data -----
             SequenceRecordReader trainFeatures = new CSVSequenceRecordReader();
@@ -185,7 +197,7 @@ public class TrainingBean implements Serializable {
             LOGGER.info("*****SAVE FITTED NORMALIZER*****");
 
             // Where to save normalizer
-            File locationToSaveNormalizer = new File("fitted_normalizer.zip");
+            File locationToSaveNormalizer = new File("fitted_normalizer_" + custNo + ".zip");
 
             // Now we want to save the normalizer to a binary file. For doing this, one can use the NormalizerSerializer.
             NormalizerSerializer serializer = NormalizerSerializer.getDefault();
@@ -253,7 +265,7 @@ public class TrainingBean implements Serializable {
             // Details
 
             // Where to save model
-            File locationToSave = new File("trained_rnn_model.zip");
+            File locationToSave = new File("trained_rnn_model_" + custNo + ".zip");
 
             // boolean save Updater
             boolean saveUpdater = false;
@@ -269,7 +281,7 @@ public class TrainingBean implements Serializable {
 // Get the rnnTimeStep state after Initialized rnnTimeStep with train data and
 // export to file / DB
             Map<String, INDArray> state = net.rnnGetPreviousState(0);
-            exportStateFile(state);
+            exportStateFile(state, custNo);
 
             trainDataIter.reset();
 
@@ -288,7 +300,7 @@ public class TrainingBean implements Serializable {
             writePredictionsToDB(predictions);
 
             // WIP
-            qualifyForecastPeriods();
+            qualifyForecastPeriods(custNo);
 
 // Fast-forward the Training Progress Bar to 100% when training method is ready
             progressBarView.setProgress(100);
@@ -307,27 +319,25 @@ public class TrainingBean implements Serializable {
      * "112,95.91917291".
      * @throws IOException
      */
-    private static List<String> prepareTrainAndTest(int trainSize, int testSize, int numberOfTimesteps) throws IOException {
+    private static List<String> prepareTrainAndTest(int trainSize, int testSize, int numberOfTimesteps, String custNumber) throws IOException {
 
-        Path rawPath = Paths.get(baseDir.getAbsolutePath() + "/data_0000000001_raw.csv");
+        Path rawPath = Paths.get(baseDir.getAbsolutePath() + "/data_" + custNumber + "_raw.csv");
 
         //Remove data files before generating new one from database
         // List all files in baseDir folder
         File folder = new File(baseDir.getAbsolutePath());
         File fList[] = folder.listFiles();
         // Searches ... raw.csv
-        for (int i = 0; i < fList.length; i++) {
-            File f = fList[i];
+        for (File f : fList) {
             if (f.getName().endsWith("raw.csv")) {
                 // and deletes
-                File target = fList[i];
+                File target = f;
                 boolean success = target.delete();
                 if (success) {
                     LOGGER.info("Deleted data file {} ", f.toPath().toAbsolutePath().toString());
                 } else {
                     LOGGER.error("Delete data file in method 'prepareTrainAndTest' {} ", f.toPath().toAbsolutePath().toString());
                 }
-
             }
         }
 
@@ -372,18 +382,19 @@ public class TrainingBean implements Serializable {
      * Method to export the RNN time step's previous state to file on disk
      *
      * @param rnnPreviousState the state to export
+     * @param custNumber customer number
      */
-    private static void exportStateFile(Map<String, INDArray> rnnPreviousState) {
+    private static void exportStateFile(Map<String, INDArray> rnnPreviousState, String custNumber) {
         try {
-            FileOutputStream f = new FileOutputStream(new File("rnnPreviousState.txt"));
+            FileOutputStream f = new FileOutputStream(new File("rnnPreviousState_" + custNumber + ".txt"));
             // Write objects to file
             try (ObjectOutputStream o = new ObjectOutputStream(f)) {
                 // Write objects to file
                 o.writeObject(rnnPreviousState);
-                LOGGER.info("SUCCESS: RNN Previous state written to file 'rnnPreviousState.txt'");
+                LOGGER.info("SUCCESS: RNN Previous state written to file 'rnnPreviousState_" + custNumber + ".txt'");
             }
         } catch (FileNotFoundException e) {
-            LOGGER.error("File 'rnnPreviousState.txt' not found.");
+            LOGGER.error("File 'rnnPreviousState_" + custNumber + ".txt' not found.");
         } catch (IOException e) {
             LOGGER.error("Error initializing stream in method 'exportStateFile'.");
         }
@@ -432,7 +443,7 @@ public class TrainingBean implements Serializable {
      */
     private void writePredictionsToDB(List<Double> predictions) {
 
-        String customerNumber = "0000000001";
+        String customerNumber = custNo;
 
         // Delete existing predictions
         String s1 = "MATCH (p:Pattern)-[:OWNED_BY]->(c:Customer {customerNumber:$custNo}), (p)<-[r]-(pr) DELETE r, pr";
@@ -478,7 +489,7 @@ public class TrainingBean implements Serializable {
         long count = 0L;
         try {
 
-            String customerNumber = "0000000001";
+            String customerNumber = custNo;
 
             String tx = "MATCH (p:Pattern)-[:OWNED_BY]->(c:Customer {customerNumber:$custNo}) RETURN COUNT(p) AS dataSize";
 
@@ -529,7 +540,7 @@ public class TrainingBean implements Serializable {
      *
      * (Prediction t+1 is always given)
      */
-    private void qualifyForecastPeriods() {
+    private void qualifyForecastPeriods(String custNumber) {
 
         // Temporary dummy input, to be pulled from evaluation stats in doTraining method.
         double trainingperformance = 0.1;
@@ -551,12 +562,12 @@ public class TrainingBean implements Serializable {
 
         // Export result to file to avoid triggering training sequence if call Getter beween html sessions
         try {
-            FileOutputStream f = new FileOutputStream(new File("qualifiedAdditionalFuturePredictions.txt"));
+            FileOutputStream f = new FileOutputStream(new File("qualifiedAdditionalFuturePredictions_" + custNumber + ".txt"));
             // Write objects to file
             try (ObjectOutputStream o = new ObjectOutputStream(f)) {
                 // Write objects to file
                 o.writeObject(addFcPeriods);
-                LOGGER.info("SUCCESS: (WIP) Training peformance qualified {} Additional Future Predictions.\nResult written to file 'qualifiedAdditionalFuturePredictions.txt'", addFcPeriods);
+                LOGGER.info("SUCCESS: (WIP) Training peformance qualified {} Additional Future Predictions.\nResult written to file 'qualifiedAdditionalFuturePredictions_" + custNumber + ".txt'", addFcPeriods);
             }
         } catch (FileNotFoundException e) {
             LOGGER.error("File 'qualifiedAdditionalFuturePredictions.txt' not found.");

@@ -21,7 +21,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import javax.inject.Named;
-import java.io.Serializable;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,6 +30,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.PostConstruct;
+import javax.annotation.security.DeclareRoles;
+import javax.annotation.security.RolesAllowed;
+import javax.ejb.Stateful;
 import javax.enterprise.context.RequestScoped;
 import javax.inject.Inject;
 import org.apache.commons.io.FileUtils;
@@ -56,6 +58,7 @@ import org.neo4j.driver.v1.exceptions.ClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.bigdatamining.forecastmaster.Neo4jBean;
+import se.bigdatamining.forecastmaster.User;
 import se.bigdatamining.forecastmaster.train.TrainingBean;
 
 /**
@@ -65,7 +68,9 @@ import se.bigdatamining.forecastmaster.train.TrainingBean;
  */
 @Named(value = "queryBean")
 @RequestScoped // Import latest data from @PostConstruct on call 'doQuery' from jsf or on refresh
-public class QueryBean implements Serializable {
+@Stateful
+@DeclareRoles({"BASIC", "PRO", "DIRECTOR", "MDM", "FORECASTER", "TRAINER"})
+public class QueryBean {
 
     @Inject
     Neo4jBean neo4jBean;
@@ -73,7 +78,9 @@ public class QueryBean implements Serializable {
     @Inject
     TrainingBean trainer;
 
-    private static final long serialVersionUID = 1L;
+    @Inject
+    User user;
+
     private static final Logger LOGGER = LoggerFactory.getLogger(QueryBean.class);
     private static Session session;
     private static INDArray newPredicted;
@@ -85,6 +92,7 @@ public class QueryBean implements Serializable {
     private static int miniBatchSize = 0;
     private double[] forecasts;
     private int additionalFuturePredictions;
+    private String custNo;
 
     /**
      * Creates a new instance of QueryBean
@@ -97,7 +105,10 @@ public class QueryBean implements Serializable {
         // INITIATE CLASS SPECIFIC MAPS AND FIELDS HERE - THE ORDER IS IMPORTANT
 
         // Initialize driver
-        this.session = neo4jBean.getDRIVER().session();
+        session = neo4jBean.getDRIVER().session();
+
+        // Get customer number
+        custNo = user.getCustomerNumber();
 
         // Get trainer fields
         previousStateTrainSize = trainer.getTrainSize();
@@ -105,7 +116,7 @@ public class QueryBean implements Serializable {
         numberOfTimesteps = trainer.getNumberOfTimesteps();
         miniBatchSize = trainer.getMiniBatchSize();
 
-        additionalFuturePredictions = getQualifiedAdditionalFuturePredictions(); // These are predictions t+2, t+3, ..., t+n
+        additionalFuturePredictions = getQualifiedAdditionalFuturePredictions(custNo); // These are predictions t+2, t+3, ..., t+n
         forecasts = new double[1 + additionalFuturePredictions];
     }
 
@@ -132,6 +143,7 @@ public class QueryBean implements Serializable {
      *
      * @throws Exception
      */
+    @RolesAllowed({"BASIC", "PRO", "DIRECTOR", "FORECASTER"})
     public void doQuery() throws Exception {
 
         LOGGER.info("Using AbsolutePath: " + baseDir.getAbsolutePath());
@@ -141,7 +153,7 @@ public class QueryBean implements Serializable {
 //        int numberOfTimesteps = 20; // Must be same as for the trained RMM
 
         //Prepare multi time step data, see method comments for more info
-        List<String> rawStrings = getQueryData(trainSize, numberOfTimesteps);
+        List<String> rawStrings = getQueryData(trainSize, numberOfTimesteps, custNo);
 
         // ----- Load the training data -----
         SequenceRecordReader trainFeatures = new CSVSequenceRecordReader();
@@ -153,7 +165,7 @@ public class QueryBean implements Serializable {
 
         LOGGER.info("*****LOAD FITTED NORMALIZER*****");
         // Where to load fitted normalizer from
-        File locationToSaveNormalizer = new File("fitted_normalizer.zip");
+        File locationToSaveNormalizer = new File("fitted_normalizer_" + custNo + ".zip");
 
         // Restore the normalizer from the stored file.
         NormalizerSerializer serializer = NormalizerSerializer.getDefault();
@@ -167,12 +179,12 @@ public class QueryBean implements Serializable {
 
         LOGGER.info("*****LOAD TRAINED MODEL*****");
         // Where to load model from
-        File locationToSave = new File("trained_rnn_model.zip");
+        File locationToSave = new File("trained_rnn_model_" + custNo + ".zip");
 
         MultiLayerNetwork net = ModelSerializer.restoreMultiLayerNetwork(locationToSave);
 
         // Import and load the state from the trained rnn
-        net.rnnSetPreviousState(0, getStateFile());
+        net.rnnSetPreviousState(0, getStateFile(custNo));
 
         // Get the predictions
         DataSet t = trainDataIter.next();
@@ -322,10 +334,10 @@ public class QueryBean implements Serializable {
     /**
      * Method to import the RNN time step's previous state from file on disk
      */
-    private static Map<String, INDArray> getStateFile() {
+    private static Map<String, INDArray> getStateFile(String custNumber) {
         Map<String, INDArray> rnnPreviousState = new HashMap<>();
         try {
-            try (FileInputStream fi = new FileInputStream(new File("rnnPreviousState.txt"));
+            try (FileInputStream fi = new FileInputStream(new File("rnnPreviousState_" + custNumber + ".txt"));
                     ObjectInputStream oi = new ObjectInputStream(fi)) {
                 // Read objects from file
                 rnnPreviousState = (Map<String, INDArray>) oi.readObject();
@@ -333,7 +345,7 @@ public class QueryBean implements Serializable {
             LOGGER.info("SUCCESS: RNN Previous state read from file");
 
         } catch (FileNotFoundException e) {
-            LOGGER.error("File 'rnnPreviousState.txt' not found.");
+            LOGGER.error("File '{}' not found.", "rnnPreviousState_" + custNumber + ".txt");
         } catch (IOException e) {
             LOGGER.error("Error initializing stream in method 'getStateFile'.");
         } catch (ClassNotFoundException e) {
@@ -350,26 +362,24 @@ public class QueryBean implements Serializable {
      * state. 2/ Future time series data to be processed. The CSV file starts
      * from the test data in the CSV file used for training and testing the RNN.
      */
-    private static List<String> getQueryData(int trainSize, int numberOfTimesteps) throws IOException {
-        Path rawPath = Paths.get(baseDir.getAbsolutePath() + "/data_0000000001_prev_state_raw.csv");
+    private static List<String> getQueryData(int trainSize, int numberOfTimesteps, String custNumber) throws IOException {
+        Path rawPath = Paths.get(baseDir.getAbsolutePath() + "/data_" + custNumber + "_prev_state_raw.csv");
 
         //Remove data files before generating new one from database
         // List all files in baseDir folder
         File folder = new File(baseDir.getAbsolutePath());
         File fList[] = folder.listFiles();
         // Searches ... prev_state_raw.csv
-        for (int i = 0; i < fList.length; i++) {
-            File f = fList[i];
+        for (File f : fList) {
             if (f.getName().endsWith("prev_state_raw.csv")) {
                 // and deletes
-                File target = fList[i];
+                File target = f;
                 boolean success = target.delete();
                 if (success) {
                     LOGGER.info("Deleted data file {} ", f.toPath().toAbsolutePath().toString());
                 } else {
                     LOGGER.error("Delete data file in method 'getQueryData' {} ", f.toPath().toAbsolutePath().toString());
                 }
-
             }
         }
 
@@ -447,7 +457,7 @@ public class QueryBean implements Serializable {
         int count = 0;
         try {
 
-            String customerNumber = "0000000001";
+            String customerNumber = custNo;
 
             String tx = "MATCH (p:Pattern)-[:OWNED_BY]->(c:Customer {customerNumber:$custNo}) RETURN COUNT(p) AS dataSize";
 
@@ -479,10 +489,10 @@ public class QueryBean implements Serializable {
      *
      * (Prediction t+1 is always given)
      */
-    private static int getQualifiedAdditionalFuturePredictions() {
+    private static int getQualifiedAdditionalFuturePredictions(String custNumber) {
         int addFcPeriods = 0;
         try {
-            try (FileInputStream fi = new FileInputStream(new File("qualifiedAdditionalFuturePredictions.txt"));
+            try (FileInputStream fi = new FileInputStream(new File("qualifiedAdditionalFuturePredictions_" + custNumber + ".txt"));
                     ObjectInputStream oi = new ObjectInputStream(fi)) {
                 // Read objects from file
                 addFcPeriods = (int) oi.readObject();
@@ -490,7 +500,7 @@ public class QueryBean implements Serializable {
             LOGGER.info("SUCCESS: Qualified additional future predictions read from file");
 
         } catch (FileNotFoundException e) {
-            LOGGER.error("File 'qualifiedAdditionalFuturePredictions.txt' not found.");
+            LOGGER.error("File 'qualifiedAdditionalFuturePredictions_" + custNumber + ".txt' not found.");
         } catch (IOException e) {
             LOGGER.error("Error initializing stream in method 'getQualifiedAdditionalFuturePredictions'.");
         } catch (ClassNotFoundException e) {
