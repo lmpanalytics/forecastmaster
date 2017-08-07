@@ -48,8 +48,14 @@ limitations under the License.
                                     <p:separator />
                                     <p:menuitem value="Quit" url="#" />
                                 </p:submenu>
+                            </ui:remove>
+                            <p:submenu label="Data" >
+                                <p:menuitem value="Forecast" outcome="/index" />
+                                <p:separator />
+                                <p:menuitem value="Train" outcome="/train" />
+                            </p:submenu>
 
-
+                            <ui:remove>
                                 <p:submenu label="Edit" icon="ui-icon-pencil">
                                     <p:menuitem value="Undo" url="#" icon="ui-icon-arrowreturnthick-1-w" />
                                     <p:menuitem value="Redo" url="#" icon="ui-icon-arrowreturnthick-1-e" />
@@ -82,14 +88,14 @@ limitations under the License.
                                 <ui:remove>
                                     <p:inputText style="margin-right:10px" placeholder="Search"/>
                                 </ui:remove>
-                                <p:commandButton type="button" value="Logout" icon="ui-icon-extlink" />
+                                <p:button value="Logout" outcome="/logout" icon="ui-icon-extlink" />
                             </f:facet>
                         </p:menubar>
 
                         <h1>LMP ForecastMaster</h1>
                     </h:form>
-
                 </p:layoutUnit>
+                
                 <p:layoutUnit position="south" size="100" closable="true" collapsible="true">
                     Footer
                 </p:layoutUnit>
