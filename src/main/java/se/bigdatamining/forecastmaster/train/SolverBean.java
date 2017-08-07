@@ -18,8 +18,15 @@ package se.bigdatamining.forecastmaster.train;
 import javax.annotation.PostConstruct;
 import javax.inject.Named;
 import javax.enterprise.context.RequestScoped;
+import javax.inject.Inject;
+import org.neo4j.driver.v1.Record;
+import org.neo4j.driver.v1.Session;
+import org.neo4j.driver.v1.StatementResult;
+import org.neo4j.driver.v1.Values;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import se.bigdatamining.forecastmaster.Neo4jBean;
+import se.bigdatamining.forecastmaster.User;
 
 /**
  * Qualifies various splits in sizes of raw data for training a neural net.
@@ -36,6 +43,14 @@ import org.slf4j.LoggerFactory;
 @Named(value = "solverBean")
 @RequestScoped
 public class SolverBean {
+
+    @Inject
+    Neo4jBean neo4jBean;
+
+    @Inject
+    User user;
+
+    private static Session session;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SolverBean.class);
 
@@ -68,6 +83,12 @@ public class SolverBean {
         // INITIATE CLASS SPECIFIC MAPS AND FIELDS HERE - THE ORDER IS IMPORTANT
 
         isFoundSolution = false;
+
+        // Initialize driver
+        session = neo4jBean.getDRIVER().session();
+
+        // Initialize rawDataSize
+        rawDataSize = queryRawDataSizeDB();
 
 // ***** Initialize trainingShareLL and testShareLL *****
         if (rawDataSize >= 150L) {
@@ -205,6 +226,36 @@ public class SolverBean {
 
         }
         return isTrainSizeDivisable;
+    }
+
+    /**
+     * Query the Database for the number of patterns in the rawdata for a
+     * specific customer. The size is used as input for the solver.
+     *
+     * @return size of rawdata
+     */
+    private Long queryRawDataSizeDB() {
+        long count = 0L;
+        try {
+
+            String customerNumber = user.getCustomerNumber();
+
+            String tx = "MATCH (p:Pattern)-[:OWNED_BY]->(c:Customer {customerNumber:$custNo}) RETURN COUNT(p) AS dataSize";
+
+            StatementResult result = session.run(tx, Values.parameters(
+                    "custNo", customerNumber
+            ));
+            while (result.hasNext()) {
+                Record next = result.next();
+
+                count = next.get("dataSize").asLong();
+
+            }
+        } catch (Exception e) {
+            LOGGER.error("Could not query the Raw Data Size from the DB");
+        }
+
+        return count;
     }
 
     public void setRawDataSize(Long rawDataSize) {

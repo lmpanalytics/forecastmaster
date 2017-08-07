@@ -127,8 +127,7 @@ public class TrainingBean {
         // Get customer number
         custNo = user.getCustomerNumber();
 
-        // Set solver fields
-        solver.setRawDataSize(queryRawDataSizeDB());
+        // Set solver field
         solver.setNumberOfTimesteps(new Long(numberOfTimesteps));
 
         // Call solver to solve for the above inputs
